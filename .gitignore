@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+
+# Environment
+.env
+
+# Data
+data/samples/
+data/chunks/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Misc
+PHASE1_PLAN.md
+
+
