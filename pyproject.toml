@@ -21,3 +21,6 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: hits real external APIs — run with pytest -m integration",
+]
