@@ -225,12 +225,11 @@ def extract_header(xml_path: str) -> dict:
             break
 
     if product_section is not None:
-        for code_el in product_section.iter(f"{{{NS}}}code"):
-            if code_el.get("codeSystem") == NCI_CS:
-                val = code_el.get("code", "")
-                if val.startswith("C735"):
-                    marketing_category = val
-                    break
+        for approval_el in product_section.iter(f"{{{NS}}}approval"):
+            code_el = approval_el.find(f"{{{NS}}}code")
+            if code_el is not None and code_el.get("codeSystem") == NCI_CS:
+                marketing_category = code_el.get("code")
+                break
 
         for mp in product_section.iter(f"{{{NS}}}manufacturedProduct"):
             if drug_name is None:
