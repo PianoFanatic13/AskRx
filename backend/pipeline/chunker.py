@@ -32,8 +32,25 @@ def _split_sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENT_BOUNDARY.split(text) if s.strip()]
 
 
+def _word_split(text: str) -> list[str]:
+    """Recursively halve text at a word boundary until all pieces are within TOKEN_CEIL.
+
+    Used as a last resort when no sentence boundary is available to split on.
+    """
+    if count_tokens(text) <= TOKEN_CEIL:
+        return [text]
+    words = text.split()
+    if len(words) <= 1:
+        return [text]  # single token-like word; can't split further
+    mid = len(words) // 2
+    return _word_split(" ".join(words[:mid])) + _word_split(" ".join(words[mid:]))
+
+
 def _enforce_ceiling(fragments: list[str]) -> list[str]:
-    """Split any fragment exceeding TOKEN_CEIL on sentence boundaries."""
+    """Split any fragment exceeding TOKEN_CEIL on sentence boundaries.
+
+    Falls back to word-midpoint splitting when no sentence boundary is found.
+    """
     result = []
     for frag in fragments:
         if count_tokens(frag) <= TOKEN_CEIL:
@@ -44,12 +61,13 @@ def _enforce_ceiling(fragments: list[str]) -> list[str]:
         for sent in sentences:
             candidate = " ".join(bucket + [sent])
             if bucket and count_tokens(candidate) > TOKEN_CEIL:
-                result.append(" ".join(bucket))
+                result.extend(_word_split(" ".join(bucket)))
                 bucket = [sent]
             else:
                 bucket.append(sent)
         if bucket:
-            result.append(" ".join(bucket))
+            remainder = " ".join(bucket)
+            result.extend(_word_split(remainder))
     return result
 
 

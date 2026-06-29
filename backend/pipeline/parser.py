@@ -280,6 +280,33 @@ def extract_header(xml_path: str) -> dict:
                     if name and name not in active_ingredients:
                         active_ingredients.append(name)
 
+    else:
+        # Old-format SPL (pre-2010): no 48780-1 product section.
+        # Product data lives directly in <manufacturedMedicine> elements;
+        # route is in a sibling <consumedIn> element.
+        for mp_el in root.iter(f"{{{NS}}}manufacturedProduct"):
+            mm = mp_el.find(f"{{{NS}}}manufacturedMedicine")
+            if mm is None:
+                continue
+            if drug_name is None:
+                drug_name = _t(mm.find(f"{{{NS}}}name"))
+            if dosage_form is None:
+                fc = mm.find(f"{{{NS}}}formCode")
+                if fc is not None:
+                    dosage_form = fc.get("displayName")
+            if route is None:
+                ci = mp_el.find(f"{{{NS}}}consumedIn")
+                if ci is not None:
+                    rc = ci.find(f".//{{{NS}}}routeCode")
+                    if rc is not None:
+                        route = rc.get("displayName")
+            for ai in mm.iter(f"{{{NS}}}activeIngredient"):
+                sub = ai.find(f"{{{NS}}}activeIngredientSubstance")
+                if sub is not None:
+                    name = _t(sub.find(f"{{{NS}}}name"))
+                    if name and name not in active_ingredients:
+                        active_ingredients.append(name)
+
     return {
         "setid":               setid,
         "effective_time":      effective_time,

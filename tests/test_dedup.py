@@ -183,3 +183,39 @@ def test_fallback_excludes_records_with_rxcui():
     ]
     result = select_canonical_no_rxcui(records)
     assert result == ["NO_RXCUI"]
+
+
+# --- None marketing_category (old-format SPL, no <approval> element) ---
+
+def test_none_category_kept_when_only_option():
+    # Old-format label with no approval element — should be kept as last resort
+    records = [_rec("OLD", "6809", "TABLET", "ORAL", None, "20060101")]
+    result = select_canonical(records)
+    assert result == ["OLD"]
+
+
+def test_none_category_loses_to_nda():
+    records = [
+        _rec("OLD", "6809", "TABLET", "ORAL", None, "20230101"),
+        _rec("NDA", "6809", "TABLET", "ORAL", NDA,  "20200101"),
+    ]
+    result = select_canonical(records)
+    assert result == ["NDA"]
+
+
+def test_none_category_loses_to_anda():
+    records = [
+        _rec("OLD",  "6809", "TABLET", "ORAL", None, "20230101"),
+        _rec("ANDA", "6809", "TABLET", "ORAL", ANDA, "20100101"),
+    ]
+    result = select_canonical(records)
+    assert result == ["ANDA"]
+
+
+def test_none_category_no_warning_logged(caplog):
+    import logging
+    # None category should not trigger the "Unknown marketing_category" warning
+    with caplog.at_level(logging.WARNING, logger="backend.pipeline.dedup"):
+        records = [_rec("OLD", "6809", "TABLET", "ORAL", None, "20060101")]
+        select_canonical(records)
+    assert "Unknown" not in caplog.text

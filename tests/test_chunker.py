@@ -56,6 +56,16 @@ def test_ceiling_preserves_paragraph_that_fits(mock_ct):
     assert chunks[0] == short
 
 
+@patch(_PATCH, side_effect=_wc)
+def test_ceiling_word_split_fallback_no_sentence_boundaries(mock_ct):
+    # All lowercase words with no .!? — sentence splitter finds nothing,
+    # word-split fallback must enforce the ceiling
+    text = _words(TOKEN_CEIL + 100)  # 550 lowercase words, no sentence breaks
+    chunks = chunk_section_text(text)
+    assert len(chunks) > 1
+    assert all(_wc(c) <= TOKEN_CEIL for c in chunks)
+
+
 # --- floor ---
 
 @patch(_PATCH, side_effect=_wc)

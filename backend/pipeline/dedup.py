@@ -47,17 +47,25 @@ def _latest(records: list[dict]) -> dict:
 
 def _pick_from_group(records: list[dict]) -> Optional[str]:
     """Return the canonical SETID for one dedup group, or None to skip the group."""
-    unknown = [r for r in records if r.get("marketing_category") not in _KNOWN_CODES]
-    for r in unknown:
+    # Genuinely unrecognized codes (non-None, not in known set) — log and skip
+    bad_code = [
+        r for r in records
+        if r.get("marketing_category") is not None
+        and r.get("marketing_category") not in _KNOWN_CODES
+    ]
+    for r in bad_code:
         log.warning(
             "Unknown marketing_category %r on setid %s — skipping record",
             r.get("marketing_category"),
             r.get("setid"),
         )
 
+    # None = old-format label with no <approval> element; keep as last resort
+    no_code = [r for r in records if r.get("marketing_category") is None]
+
     known = [r for r in records if r.get("marketing_category") in _KNOWN_CODES]
     if not known:
-        return None
+        return _latest(no_code)["setid"] if no_code else None
 
     # NDA/BLA is the authoritative label; drop ANDAs when one is present
     nda_bla = [r for r in known if r["marketing_category"] in NDA_CODES]

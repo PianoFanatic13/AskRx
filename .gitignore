@@ -13,8 +13,7 @@ build/
 .env
 
 # Data
-data/samples/
-data/chunks/
+data/
 
 # IDE
 .vscode/
