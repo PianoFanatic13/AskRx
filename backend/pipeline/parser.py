@@ -101,7 +101,7 @@ def _resolve_loinc(
     title: str,
     parent_loinc: Optional[str],
 ) -> tuple[Optional[str], Optional[str]]:
-    # Priority: direct code → title inference → inherit from parent → None
+    # Priority: direct code -> title inference -> inherit from parent -> None
     # 42229-5 (unclassified) is treated as absent so inheritance still applies
     if code_el is not None:
         cs = code_el.get("codeSystem", "")
@@ -139,10 +139,33 @@ def _get_section_type(loinc_code: Optional[str], doc_type: Optional[str]) -> str
     return "standard"
 
 
+def _inline_text(el) -> str:
+    return re.sub(r'\s+', ' ', " ".join(el.itertext())).strip()
+
+
 def _extract_text(text_el) -> str:
     if text_el is None:
         return ""
-    return re.sub(r'\s+', ' ', " ".join(text_el.itertext())).strip()
+    blocks = []
+    for child in text_el:
+        tag = etree.QName(child.tag).localname
+        if tag == "renderMultiMedia":
+            continue
+        if tag == "list":
+            items = [
+                _inline_text(item)
+                for item in child.iter(f"{{{NS}}}item")
+                if _inline_text(item)
+            ]
+            if items:
+                blocks.append("\n".join(items))
+        else:
+            t = _inline_text(child)
+            if t:
+                blocks.append(t)
+    if not blocks:
+        return _inline_text(text_el)
+    return "\n\n".join(blocks)
 
 
 def _walk(
