@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS chunks (
 
     -- Merge info
     merged              BOOLEAN NOT NULL DEFAULT FALSE,
-    merged_title_paths  TEXT[][],           -- NULL unless merged = TRUE
+    merged_title_paths  JSONB,              -- NULL unless merged = TRUE
 
     -- Vector embedding (BGE-large-en-v1.5 = 1024 dimensions)
     embedding           vector(1024),

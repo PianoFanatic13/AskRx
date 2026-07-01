@@ -4,7 +4,9 @@ import logging
 from pathlib import Path
 
 import psycopg
+import torch
 from pgvector.psycopg import register_vector
+from psycopg.types.json import Jsonb
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
@@ -12,12 +14,9 @@ log = logging.getLogger(__name__)
 
 _MODEL_ID = "BAAI/bge-large-en-v1.5"
 _DEFAULT_BATCH = 64
-# BGE-large supports 512 tokens total including [CLS] and [SEP], so content must be ≤ 510.
-# The chunker's 450-token ceiling leaves plenty of headroom; this is a final safety net.
-_TOKEN_LIMIT = 510
 _DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
 
-# dosage_form and route are not currently emitted by chunk_section(); columns will be NULL.
+# dosage_form and route are not currently emitted by chunk_section(), columns will be NULL.
 _INSERT = """
     INSERT INTO chunks (
         setid, drug_name, rxcui,
@@ -33,6 +32,20 @@ _INSERT = """
 """
 
 
+def _iter_batches(path: Path, batch_size: int):
+    batch = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                batch.append(json.loads(line))
+                if len(batch) == batch_size:
+                    yield batch
+                    batch = []
+    if batch:
+        yield batch
+
+
 def embed_and_index(
     jsonl_path: Path,
     dsn: str,
@@ -41,24 +54,12 @@ def embed_and_index(
     model_id: str = _MODEL_ID,
     clear: bool = False,
 ) -> None:
-    log.info("Loading model %s ...", model_id)
-    model = SentenceTransformer(model_id)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    log.info("Loading model %s on %s ...", model_id, device)
+    model = SentenceTransformer(model_id, device=device)
 
-    log.info("Reading chunks from %s ...", jsonl_path)
-    chunks = []
-    with jsonl_path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                chunks.append(json.loads(line))
-    log.info("%d chunks loaded", len(chunks))
-
-    oversize = [c for c in chunks if c["token_count"] > _TOKEN_LIMIT]
-    if oversize:
-        raise ValueError(
-            f"{len(oversize)} chunks exceed the {_TOKEN_LIMIT}-token BGE-large limit. "
-            f"First: setid={oversize[0]['setid']}, token_count={oversize[0]['token_count']}"
-        )
+    total = sum(1 for ln in jsonl_path.open("r", encoding="utf-8") if ln.strip())
+    log.info("Embedding %d chunks from %s", total, jsonl_path)
 
     with psycopg.connect(dsn) as conn:
         register_vector(conn)
@@ -70,16 +71,30 @@ def embed_and_index(
             log.info("Cleared existing rows from chunks table")
 
         chunks_written = 0
-        for start in tqdm(range(0, len(chunks), batch_size), desc="Embedding"):
-            batch = chunks[start : start + batch_size]
+        total_batches = (total + batch_size - 1) // batch_size
+        for batch in tqdm(_iter_batches(jsonl_path, batch_size), total=total_batches, desc="Embedding"):
             texts = [c["chunk_text"] for c in batch]
             embeddings = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
 
+            rows = []
+            for chunk, emb in zip(batch, embeddings):
+                row = {**chunk, "embedding": emb.tolist()}
+                if row["merged_title_paths"] is not None:
+                    row["merged_title_paths"] = Jsonb(row["merged_title_paths"])
+                rows.append(row)
             with conn.cursor() as cur:
-                for chunk, emb in zip(batch, embeddings):
-                    cur.execute(_INSERT, {**chunk, "embedding": emb.tolist()})
+                cur.executemany(_INSERT, rows)
             conn.commit()
             chunks_written += len(batch)
+
+        with conn.cursor() as cur:
+            cur.execute("DROP INDEX IF EXISTS chunks_embedding_idx")
+            cur.execute(
+                "CREATE INDEX chunks_embedding_idx ON chunks"
+                " USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
+            )
+        conn.commit()
+        log.info("IVFFlat index rebuilt on %d rows", chunks_written)
 
     log.info("Done: %d chunks embedded and indexed", chunks_written)
 
