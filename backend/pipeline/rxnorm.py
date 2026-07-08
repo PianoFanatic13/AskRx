@@ -13,9 +13,12 @@ _failure_log_path: Optional[Path] = None
 
 
 def set_failure_log(path) -> None:
-    """Configure a file to append failed RxNorm lookups (TSV: timestamp, name)."""
+    """Configure a file to append failed RxNorm lookups (TSV: timestamp, name).
+
+    Pass None to disable logging.
+    """
     global _failure_log_path
-    _failure_log_path = Path(path)
+    _failure_log_path = Path(path) if path is not None else None
 
 
 def _record_failure(name: str) -> None:
@@ -77,19 +80,45 @@ def find_rxcui_exact(name: str) -> Optional[str]:
     return None
 
 
+def find_rxcui_approx_candidates(name: str) -> list[dict]:
+    """Return distinct real-drug candidates for a name that failed exact lookup.
+
+    Uses RxNorm's spellingsuggestions endpoint (built for typo correction,
+    unlike approximateTerm's score, which is an unbounded relevance number
+    rather than a confidence percentage and isn't a reliable filter on its
+    own). Each suggestion is resolved via exact lookup and deduped by rxcui;
+    suggestions that don't resolve to a real rxcui are dropped. More than one
+    distinct candidate means the name is a genuine ambiguous typo (it reads
+    as close to two or more different drugs), not just a case to filter by
+    score.
+    """
+    data = _get(f"{BASE}/spellingsuggestions.json", {"name": name})
+    suggestion_group = data.get("suggestionGroup") or {}
+    suggestion_list = suggestion_group.get("suggestionList") or {}
+    suggestions = suggestion_list.get("suggestion") or []
+
+    candidates = []
+    seen_rxcuis = set()
+    for suggestion in suggestions:
+        rxcui = find_rxcui_exact(suggestion)
+        if rxcui is None or rxcui in seen_rxcuis:
+            continue
+        seen_rxcuis.add(rxcui)
+        candidates.append({"name": suggestion, "rxcui": rxcui})
+    return candidates
+
+
 def find_rxcui_approx(name: str) -> Optional[str]:
     """Return RXCUI via approximate match when exact lookup fails.
 
-    Only accepts hits with score == 100 to avoid wrong-drug false positives.
+    Only resolves when the spelling suggestions point to exactly one real
+    drug. An ambiguous typo (multiple plausible candidates, e.g. "metfromin"
+    matching both "merbromin" and "metformin") returns None rather than
+    guessing between them.
     """
-    data = _get(
-        f"{BASE}/approximateTerm.json",
-        {"term": name, "maxEntries": "5", "option": "0"},
-    )
-    candidates = data.get("approximateGroup", {}).get("candidate", [])
-    for c in candidates:
-        if c.get("score") == "100":
-            return c["rxcui"]
+    candidates = find_rxcui_approx_candidates(name)
+    if len(candidates) == 1:
+        return candidates[0]["rxcui"]
     return None
 
 

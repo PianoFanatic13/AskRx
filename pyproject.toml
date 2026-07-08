@@ -23,4 +23,5 @@ dev = [
 testpaths = ["tests"]
 markers = [
     "integration: hits real external APIs — run with pytest -m integration",
+    "db: requires a running Postgres+pgvector instance — run with pytest -m db",
 ]
