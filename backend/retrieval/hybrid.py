@@ -1,6 +1,7 @@
 from typing import Optional
 
 from backend.retrieval.dense import dense_search
+from backend.retrieval.rxnorm_query import resolve_query_drug
 from backend.retrieval.text_search import text_search
 
 _DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
@@ -55,3 +56,61 @@ def hybrid_search(
 
     ranked_ids = sorted(fused_scores, key=lambda cid: fused_scores[cid], reverse=True)[:top_k]
     return [{**chunks_by_id[cid], "rrf_score": fused_scores[cid]} for cid in ranked_ids]
+
+
+def resolve_and_search(
+    query_text: str,
+    drug_name: Optional[str] = None,
+    *,
+    query_embedding: Optional[list[float]] = None,
+    retriever_top_k: int = 30,
+    top_k: int = 10,
+    dsn: str = _DEFAULT_DSN,
+) -> dict:
+    """Resolve drug_name to an rxcui (if given) and run a filtered hybrid_search.
+
+    Returns:
+        {
+            "results": list[dict],        # same shape hybrid_search returns
+            "filter_applied": bool,        # False if unfiltered, for any reason
+            "match_type": str | None,      # resolve_query_drug's match_type, or None if no drug_name given
+            "candidates": list[dict],      # populated only when match_type == "ambiguous"
+            "resolution_note": str | None, # explains an unfiltered fallback, else None
+        }
+
+    A resolution failure (ambiguous or unresolved) falls back to an
+    unfiltered hybrid_search rather than returning no results — the coverage
+    gap is surfaced via filter_applied/resolution_note instead of being
+    silently swallowed.
+    """
+    if drug_name is None:
+        results = hybrid_search(
+            query_text, query_embedding=query_embedding, rxcui=None,
+            retriever_top_k=retriever_top_k, top_k=top_k, dsn=dsn,
+        )
+        return {
+            "results": results, "filter_applied": False,
+            "match_type": None, "candidates": [], "resolution_note": None,
+        }
+
+    resolution = resolve_query_drug(drug_name)
+    rxcui = resolution["rxcui"]
+    results = hybrid_search(
+        query_text, query_embedding=query_embedding, rxcui=rxcui,
+        retriever_top_k=retriever_top_k, top_k=top_k, dsn=dsn,
+    )
+
+    resolution_note = None
+    if resolution["match_type"] == "ambiguous":
+        names = ", ".join(c["name"] for c in resolution["candidates"])
+        resolution_note = f"'{drug_name}' is ambiguous (could be: {names}); searched without a drug filter"
+    elif resolution["match_type"] == "unresolved":
+        resolution_note = f"could not resolve '{drug_name}' to a known drug; searched without a drug filter"
+
+    return {
+        "results": results,
+        "filter_applied": rxcui is not None,
+        "match_type": resolution["match_type"],
+        "candidates": resolution["candidates"],
+        "resolution_note": resolution_note,
+    }

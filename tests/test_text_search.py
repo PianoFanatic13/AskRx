@@ -1,6 +1,6 @@
 import pytest
 
-from backend.retrieval.text_search import text_search
+from backend.retrieval.text_search import get_section, text_search
 
 pytestmark = pytest.mark.db
 
@@ -91,5 +91,34 @@ class TestResultShape:
             "id", "setid", "drug_name", "rxcui", "loinc_code",
             "section_title_path", "section_type", "chunk_text",
             "token_count", "rank",
+        }
+        assert expected <= set(results[0].keys())
+
+
+class TestGetSection:
+    def test_returns_section_chunks_in_document_order(self, seeded_section_chunks):
+        results = get_section("9001", "34071-1")
+        result_ids = [r["id"] for r in results]
+        expected_ids = [seeded_section_chunks[i]["id"] for i in (0, 1, 2)]
+        assert result_ids == expected_ids
+
+    def test_other_rxcui_excluded(self, seeded_section_chunks):
+        results = get_section("9001", "34071-1")
+        other_drug_id = seeded_section_chunks[3]["id"]  # rxcui=9002
+        assert other_drug_id not in {r["id"] for r in results}
+
+    def test_other_section_same_drug_excluded(self, seeded_section_chunks):
+        results = get_section("9001", "34071-1")
+        other_section_id = seeded_section_chunks[4]["id"]  # loinc_code=34090-1
+        assert other_section_id not in {r["id"] for r in results}
+
+    def test_no_match_returns_empty(self, seeded_section_chunks):
+        assert get_section("0000", "00000-0") == []
+
+    def test_rows_have_expected_keys(self, seeded_section_chunks):
+        results = get_section("9001", "34071-1")
+        expected = {
+            "id", "setid", "drug_name", "rxcui", "loinc_code",
+            "section_title_path", "section_type", "chunk_text", "token_count",
         }
         assert expected <= set(results[0].keys())

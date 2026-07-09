@@ -44,3 +44,24 @@ def text_search(
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             return cur.fetchall()
+
+
+_SECTION_QUERY = f"""
+    SELECT {_COLUMNS}
+    FROM chunks
+    WHERE rxcui = %(rxcui)s AND loinc_code = %(loinc_code)s
+    ORDER BY id
+"""
+
+
+def get_section(rxcui: str, loinc_code: str, *, dsn: str = _DEFAULT_DSN) -> list[dict]:
+    """Exact, unranked fetch of every chunk in one drug's section.
+
+    No sequence column exists on chunks, so ORDER BY id stands in for
+    document order — ids increase in document order since chunks are
+    inserted in the order the chunker produces them.
+    """
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(_SECTION_QUERY, {"rxcui": rxcui, "loinc_code": loinc_code})
+            return cur.fetchall()

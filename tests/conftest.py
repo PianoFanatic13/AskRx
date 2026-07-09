@@ -194,6 +194,69 @@ def seeded_dense_chunks():
 
 
 @pytest.fixture
+def seeded_section_chunks():
+    """Insert fake chunks for get_section's exact rxcui+loinc_code fetch tests.
+
+    Rows (index reference for tests):
+      0, 1, 2: drugsec/9001, loinc_code=34071-1 — the target section, 3 chunks
+               inserted in order, so their ids ascend in document order
+      3: drugsec/9002, loinc_code=34071-1 — other-rxcui control (filter test)
+      4: drugsec/9001, loinc_code=34090-1 — other-section, same drug control
+         (confirms loinc_code filter isn't ignored)
+    """
+    run_id = uuid.uuid4().hex[:8]
+
+    def sid(n):
+        return f"{_TEST_PREFIX}{run_id}-{n}"
+
+    rows = [
+        dict(
+            setid=sid(1), drug_name="drugsec", rxcui="9001", loinc_code="34071-1",
+            section_type="standard", chunk_text="Zqlorafenib section chunk 1 of 3.",
+            token_count=6,
+        ),
+        dict(
+            setid=sid(2), drug_name="drugsec", rxcui="9001", loinc_code="34071-1",
+            section_type="standard", chunk_text="Zqlorafenib section chunk 2 of 3.",
+            token_count=6,
+        ),
+        dict(
+            setid=sid(3), drug_name="drugsec", rxcui="9001", loinc_code="34071-1",
+            section_type="standard", chunk_text="Zqlorafenib section chunk 3 of 3.",
+            token_count=6,
+        ),
+        dict(
+            setid=sid(4), drug_name="drugsex", rxcui="9002", loinc_code="34071-1",
+            section_type="standard", chunk_text="Zqlorafenib other-drug control chunk.",
+            token_count=5,
+        ),
+        dict(
+            setid=sid(5), drug_name="drugsec", rxcui="9001", loinc_code="34090-1",
+            section_type="standard", chunk_text="Zqlorafenib other-section control chunk.",
+            token_count=5,
+        ),
+    ]
+
+    with psycopg.connect(DSN) as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            for row in rows:
+                cur.execute(_INSERT, row)
+                row["id"] = cur.fetchone()["id"]
+        conn.commit()
+
+    try:
+        yield rows
+    finally:
+        with psycopg.connect(DSN) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM chunks WHERE setid LIKE %s",
+                    (f"{_TEST_PREFIX}{run_id}-%",),
+                )
+            conn.commit()
+
+
+@pytest.fixture
 def seeded_hybrid_chunks():
     """Insert fake chunks with keyword rank and dense rank deliberately crossed.
 

@@ -1,6 +1,7 @@
 import pytest
 
-from backend.retrieval.hybrid import hybrid_search, reciprocal_rank_fusion
+import backend.retrieval.hybrid as hybrid_module
+from backend.retrieval.hybrid import hybrid_search, reciprocal_rank_fusion, resolve_and_search
 from tests.conftest import QUERY_VECTOR
 
 
@@ -108,3 +109,96 @@ class TestHybridSearchDB:
             "zqlorafenib headache", query_embedding=QUERY_VECTOR, rxcui="7001", top_k=10
         )
         assert all("rrf_score" in r for r in results)
+
+
+class TestResolveAndSearch:
+    def test_no_drug_name_skips_resolution(self, monkeypatch):
+        def _fail(*args, **kwargs):
+            raise AssertionError("should not resolve when drug_name is None")
+
+        monkeypatch.setattr(hybrid_module, "resolve_query_drug", _fail)
+        monkeypatch.setattr(hybrid_module, "hybrid_search", lambda *a, **k: ["chunk"])
+
+        result = resolve_and_search("side effects", None)
+
+        assert result == {
+            "results": ["chunk"], "filter_applied": False,
+            "match_type": None, "candidates": [], "resolution_note": None,
+        }
+
+    def test_resolved_name_filters_and_reports_applied(self, monkeypatch):
+        calls = {}
+
+        def fake_hybrid_search(query_text, *, rxcui=None, **kwargs):
+            calls["rxcui"] = rxcui
+            return ["chunk"]
+
+        monkeypatch.setattr(
+            hybrid_module, "resolve_query_drug",
+            lambda name: {"rxcui": "6809", "match_type": "exact", "candidates": []},
+        )
+        monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
+
+        result = resolve_and_search("side effects", "metformin")
+
+        assert calls["rxcui"] == "6809"
+        assert result["filter_applied"] is True
+        assert result["match_type"] == "exact"
+        assert result["resolution_note"] is None
+        assert result["results"] == ["chunk"]
+
+    def test_ambiguous_name_falls_back_unfiltered(self, monkeypatch):
+        calls = {}
+        candidates = [{"name": "merbromin", "rxcui": "1001"}, {"name": "metformin", "rxcui": "6809"}]
+
+        def fake_hybrid_search(query_text, *, rxcui=None, **kwargs):
+            calls["rxcui"] = rxcui
+            return ["chunk"]
+
+        monkeypatch.setattr(
+            hybrid_module, "resolve_query_drug",
+            lambda name: {"rxcui": None, "match_type": "ambiguous", "candidates": candidates},
+        )
+        monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
+
+        result = resolve_and_search("side effects", "metfromin")
+
+        assert calls["rxcui"] is None
+        assert result["filter_applied"] is False
+        assert result["match_type"] == "ambiguous"
+        assert result["candidates"] == candidates
+        assert "merbromin" in result["resolution_note"]
+        assert "metformin" in result["resolution_note"]
+
+    def test_unresolved_name_falls_back_unfiltered(self, monkeypatch):
+        calls = {}
+
+        def fake_hybrid_search(query_text, *, rxcui=None, **kwargs):
+            calls["rxcui"] = rxcui
+            return ["chunk"]
+
+        monkeypatch.setattr(
+            hybrid_module, "resolve_query_drug",
+            lambda name: {"rxcui": None, "match_type": "unresolved", "candidates": []},
+        )
+        monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
+
+        result = resolve_and_search("side effects", "zqlorafenibxyz123")
+
+        assert calls["rxcui"] is None
+        assert result["filter_applied"] is False
+        assert result["match_type"] == "unresolved"
+        assert result["candidates"] == []
+        assert result["resolution_note"] is not None
+
+    def test_results_are_passed_through_unchanged(self, monkeypatch):
+        sentinel = [{"id": 1, "chunk_text": "x"}]
+        monkeypatch.setattr(
+            hybrid_module, "resolve_query_drug",
+            lambda name: {"rxcui": "6809", "match_type": "exact", "candidates": []},
+        )
+        monkeypatch.setattr(hybrid_module, "hybrid_search", lambda *a, **k: sentinel)
+
+        result = resolve_and_search("side effects", "metformin")
+
+        assert result["results"] is sentinel
