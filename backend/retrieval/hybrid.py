@@ -1,5 +1,7 @@
 from typing import Optional
 
+import psycopg
+
 from backend.retrieval.dense import dense_search
 from backend.retrieval.rxnorm_query import resolve_query_drug
 from backend.retrieval.text_search import text_search
@@ -58,6 +60,13 @@ def hybrid_search(
     return [{**chunks_by_id[cid], "rrf_score": fused_scores[cid]} for cid in ranked_ids]
 
 
+def _rxcui_has_chunks(rxcui: str, dsn: str) -> bool:
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT EXISTS(SELECT 1 FROM chunks WHERE rxcui = %s)", (rxcui,))
+            return cur.fetchone()[0]
+
+
 def resolve_and_search(
     query_text: str,
     drug_name: Optional[str] = None,
@@ -73,7 +82,7 @@ def resolve_and_search(
         {
             "results": list[dict],        # same shape hybrid_search returns
             "filter_applied": bool,        # False if unfiltered, for any reason
-            "match_type": str | None,      # resolve_query_drug's match_type, or None if no drug_name given
+            "match_type": str | None,      # resolve_query_drug's match_type, "not_indexed", or None
             "candidates": list[dict],      # populated only when match_type == "ambiguous"
             "resolution_note": str | None, # explains an unfiltered fallback, else None
         }
@@ -82,6 +91,14 @@ def resolve_and_search(
     unfiltered hybrid_search rather than returning no results — the coverage
     gap is surfaced via filter_applied/resolution_note instead of being
     silently swallowed.
+
+    A resolved rxcui can still be absent from the indexed corpus (e.g. RxNorm
+    resolves a brand name to a brand-level concept, while chunks are stored
+    under the ingredient's rxcui; or a combination product's own label was
+    dropped during ingestion dedup). Filtering on such an rxcui would silently
+    match nothing, so it's verified against the corpus before trusting it —
+    match_type becomes "not_indexed" and the search falls back unfiltered,
+    same as an outright unresolved name.
     """
     if drug_name is None:
         results = hybrid_search(
@@ -95,22 +112,35 @@ def resolve_and_search(
 
     resolution = resolve_query_drug(drug_name)
     rxcui = resolution["rxcui"]
+    match_type = resolution["match_type"]
+    candidates = resolution["candidates"]
+
+    if rxcui is not None and not _rxcui_has_chunks(rxcui, dsn):
+        rxcui = None
+        match_type = "not_indexed"
+        candidates = []
+
     results = hybrid_search(
         query_text, query_embedding=query_embedding, rxcui=rxcui,
         retriever_top_k=retriever_top_k, top_k=top_k, dsn=dsn,
     )
 
     resolution_note = None
-    if resolution["match_type"] == "ambiguous":
-        names = ", ".join(c["name"] for c in resolution["candidates"])
+    if match_type == "ambiguous":
+        names = ", ".join(c["name"] for c in candidates)
         resolution_note = f"'{drug_name}' is ambiguous (could be: {names}); searched without a drug filter"
-    elif resolution["match_type"] == "unresolved":
+    elif match_type == "unresolved":
         resolution_note = f"could not resolve '{drug_name}' to a known drug; searched without a drug filter"
+    elif match_type == "not_indexed":
+        resolution_note = (
+            f"'{drug_name}' resolved to a real drug, but it isn't represented "
+            "in the indexed corpus; searched without a drug filter"
+        )
 
     return {
         "results": results,
         "filter_applied": rxcui is not None,
-        "match_type": resolution["match_type"],
-        "candidates": resolution["candidates"],
+        "match_type": match_type,
+        "candidates": candidates,
         "resolution_note": resolution_note,
     }

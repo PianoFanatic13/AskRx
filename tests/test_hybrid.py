@@ -138,6 +138,7 @@ class TestResolveAndSearch:
             lambda name: {"rxcui": "6809", "match_type": "exact", "candidates": []},
         )
         monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
+        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", lambda rxcui, dsn: True)
 
         result = resolve_and_search("side effects", "metformin")
 
@@ -146,6 +147,42 @@ class TestResolveAndSearch:
         assert result["match_type"] == "exact"
         assert result["resolution_note"] is None
         assert result["results"] == ["chunk"]
+
+    def test_resolved_but_not_indexed_falls_back_unfiltered(self, monkeypatch):
+        calls = {}
+
+        def fake_hybrid_search(query_text, *, rxcui=None, **kwargs):
+            calls["rxcui"] = rxcui
+            return ["chunk"]
+
+        monkeypatch.setattr(
+            hybrid_module, "resolve_query_drug",
+            lambda name: {"rxcui": "202433", "match_type": "exact", "candidates": []},
+        )
+        monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
+        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", lambda rxcui, dsn: False)
+
+        result = resolve_and_search("dosage", "Tylenol")
+
+        assert calls["rxcui"] is None
+        assert result["filter_applied"] is False
+        assert result["match_type"] == "not_indexed"
+        assert result["candidates"] == []
+        assert "Tylenol" in result["resolution_note"]
+
+    def test_ambiguous_and_unresolved_skip_the_indexed_check(self, monkeypatch):
+        def _fail(*args, **kwargs):
+            raise AssertionError("should not check corpus coverage when rxcui is already None")
+
+        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", _fail)
+        monkeypatch.setattr(hybrid_module, "hybrid_search", lambda *a, **k: ["chunk"])
+
+        monkeypatch.setattr(
+            hybrid_module, "resolve_query_drug",
+            lambda name: {"rxcui": None, "match_type": "unresolved", "candidates": []},
+        )
+        result = resolve_and_search("side effects", "zqlorafenibxyz123")
+        assert result["match_type"] == "unresolved"
 
     def test_ambiguous_name_falls_back_unfiltered(self, monkeypatch):
         calls = {}
@@ -198,6 +235,7 @@ class TestResolveAndSearch:
             lambda name: {"rxcui": "6809", "match_type": "exact", "candidates": []},
         )
         monkeypatch.setattr(hybrid_module, "hybrid_search", lambda *a, **k: sentinel)
+        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", lambda rxcui, dsn: True)
 
         result = resolve_and_search("side effects", "metformin")
 
