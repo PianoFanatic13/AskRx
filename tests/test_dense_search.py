@@ -1,6 +1,7 @@
 import psycopg
 import pytest
 
+import backend.retrieval.dense as dense_module
 from backend.retrieval.dense import dense_search
 from tests.conftest import DSN, QUERY_VECTOR, _unit_vector
 
@@ -120,19 +121,17 @@ class TestResultShape:
 
 
 class TestIndexUsage:
-    def test_query_plan_uses_ivfflat_index(self, seeded_dense_chunks):
+    def test_query_uses_raw_cosine_distance_expression_not_alias(self):
         # Regression guard: ORDER BY must reference the raw <=> expression (not
-        # a "similarity" alias) or Postgres silently falls back to a sequential
-        # scan/full sort across all ~434k rows instead of using
-        # chunks_embedding_idx. See dense.py's comment on this.
-        with psycopg.connect(DSN) as conn:
-            from pgvector.psycopg import register_vector
-
-            register_vector(conn)
-            with conn.cursor() as cur:
-                cur.execute(
-                    "EXPLAIN SELECT id FROM chunks ORDER BY embedding <=> %s::vector LIMIT 5",
-                    (QUERY_VECTOR,),
-                )
-                plan = "\n".join(row[0] for row in cur.fetchall())
-        assert "Index Scan" in plan and "chunks_embedding_idx" in plan
+        # a "similarity" alias) or Postgres can't recognize it against
+        # chunks_embedding_idx and falls back to a sequential scan. This can't
+        # be checked via a live EXPLAIN against a small seeded fixture table —
+        # Postgres's planner correctly prefers a sequential scan over the
+        # index on a handful of rows regardless of query shape, since a seq
+        # scan really is cheaper at that size (confirmed: this assertion only
+        # holds against the real ~434k-row corpus, verified manually via
+        # EXPLAIN ANALYZE during Block 2 — see PHASE2_PLAN.md). So this checks
+        # the query text itself, which is what actually matters and is
+        # environment-independent.
+        assert "ORDER BY embedding <=>" in dense_module._QUERY
+        assert "ORDER BY similarity" not in dense_module._QUERY

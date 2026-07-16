@@ -1,7 +1,6 @@
 import io
 import zipfile
 
-import pytest
 
 from backend.pipeline.downloader import extract_xmls
 

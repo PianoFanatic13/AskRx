@@ -1,8 +1,7 @@
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from backend.pipeline.pipeline import (
     load_rxnorm_cache,
@@ -116,7 +115,7 @@ def test_single_ingredient_label_gets_resolved_rxcui(tmp_path):
     output_path = tmp_path / "out.jsonl"
 
     with (
-        patch(f"{_MODULE}.extract_header", return_value=_fake_header(setid, ["metformin"])) as mock_header,
+        patch(f"{_MODULE}.extract_header", return_value=_fake_header(setid, ["metformin"])),
         patch(f"{_MODULE}.resolve_rxcui", return_value="6809"),
         patch(f"{_MODULE}.select_canonical", return_value=[]) as mock_canonical,
         patch(f"{_MODULE}.select_canonical_no_rxcui", return_value=[]),
