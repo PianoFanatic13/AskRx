@@ -127,10 +127,10 @@ class TestResolveAndSearch:
         }
 
     def test_resolved_name_filters_and_reports_applied(self, monkeypatch):
-        calls = {}
+        calls = []
 
         def fake_hybrid_search(query_text, *, rxcui=None, **kwargs):
-            calls["rxcui"] = rxcui
+            calls.append(rxcui)
             return ["chunk"]
 
         monkeypatch.setattr(
@@ -138,50 +138,59 @@ class TestResolveAndSearch:
             lambda name: {"rxcui": "6809", "match_type": "exact", "candidates": []},
         )
         monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
-        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", lambda rxcui, dsn: True)
 
         result = resolve_and_search("side effects", "metformin")
 
-        assert calls["rxcui"] == "6809"
+        # Exactly one search — the resolved rxcui had results, so no second
+        # (unfiltered fallback) search should have run.
+        assert calls == ["6809"]
         assert result["filter_applied"] is True
         assert result["match_type"] == "exact"
         assert result["resolution_note"] is None
         assert result["results"] == ["chunk"]
 
     def test_resolved_but_not_indexed_falls_back_unfiltered(self, monkeypatch):
-        calls = {}
+        calls = []
 
         def fake_hybrid_search(query_text, *, rxcui=None, **kwargs):
-            calls["rxcui"] = rxcui
-            return ["chunk"]
+            calls.append(rxcui)
+            # The resolved rxcui has zero chunks in the corpus; the unfiltered
+            # fallback call (rxcui=None) does find results.
+            return [] if rxcui is not None else ["chunk"]
 
         monkeypatch.setattr(
             hybrid_module, "resolve_query_drug",
             lambda name: {"rxcui": "202433", "match_type": "exact", "candidates": []},
         )
         monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
-        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", lambda rxcui, dsn: False)
 
         result = resolve_and_search("dosage", "Tylenol")
 
-        assert calls["rxcui"] is None
+        assert calls == ["202433", None]
         assert result["filter_applied"] is False
         assert result["match_type"] == "not_indexed"
         assert result["candidates"] == []
         assert "Tylenol" in result["resolution_note"]
+        assert result["results"] == ["chunk"]
 
-    def test_ambiguous_and_unresolved_skip_the_indexed_check(self, monkeypatch):
-        def _fail(*args, **kwargs):
-            raise AssertionError("should not check corpus coverage when rxcui is already None")
+    def test_ambiguous_and_unresolved_search_only_once(self, monkeypatch):
+        calls = []
 
-        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", _fail)
-        monkeypatch.setattr(hybrid_module, "hybrid_search", lambda *a, **k: ["chunk"])
+        def fake_hybrid_search(query_text, *, rxcui=None, **kwargs):
+            calls.append(rxcui)
+            return ["chunk"]
 
+        monkeypatch.setattr(hybrid_module, "hybrid_search", fake_hybrid_search)
         monkeypatch.setattr(
             hybrid_module, "resolve_query_drug",
             lambda name: {"rxcui": None, "match_type": "unresolved", "candidates": []},
         )
+
         result = resolve_and_search("side effects", "zqlorafenibxyz123")
+
+        # rxcui was already None from resolution — never filtered, so there's
+        # nothing to fall back from and only one search should run.
+        assert calls == [None]
         assert result["match_type"] == "unresolved"
 
     def test_ambiguous_name_falls_back_unfiltered(self, monkeypatch):
@@ -235,7 +244,6 @@ class TestResolveAndSearch:
             lambda name: {"rxcui": "6809", "match_type": "exact", "candidates": []},
         )
         monkeypatch.setattr(hybrid_module, "hybrid_search", lambda *a, **k: sentinel)
-        monkeypatch.setattr(hybrid_module, "_rxcui_has_chunks", lambda rxcui, dsn: True)
 
         result = resolve_and_search("side effects", "metformin")
 

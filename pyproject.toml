@@ -20,6 +20,9 @@ dev = [
     "ruff>=0.6",
 ]
 
+[tool.setuptools.packages.find]
+include = ["backend", "backend.*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

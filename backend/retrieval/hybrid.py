@@ -1,7 +1,5 @@
 from typing import Optional
 
-import psycopg
-
 from backend.retrieval.dense import dense_search
 from backend.retrieval.rxnorm_query import resolve_query_drug
 from backend.retrieval.text_search import text_search
@@ -60,13 +58,6 @@ def hybrid_search(
     return [{**chunks_by_id[cid], "rrf_score": fused_scores[cid]} for cid in ranked_ids]
 
 
-def _rxcui_has_chunks(rxcui: str, dsn: str) -> bool:
-    with psycopg.connect(dsn) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT EXISTS(SELECT 1 FROM chunks WHERE rxcui = %s)", (rxcui,))
-            return cur.fetchone()[0]
-
-
 def resolve_and_search(
     query_text: str,
     drug_name: Optional[str] = None,
@@ -96,34 +87,39 @@ def resolve_and_search(
     resolves a brand name to a brand-level concept, while chunks are stored
     under the ingredient's rxcui; or a combination product's own label was
     dropped during ingestion dedup). Filtering on such an rxcui would silently
-    match nothing, so it's verified against the corpus before trusting it —
-    match_type becomes "not_indexed" and the search falls back unfiltered,
-    same as an outright unresolved name.
+    match nothing, so the filtered search's own result is used as the check —
+    a resolved rxcui that's actually absent from the corpus returns zero
+    results (dense_search's ANN component never applies a relevance
+    threshold, so a real rxcui with any chunks at all is guaranteed at least
+    one match), which is treated the same as an outright unresolved name and
+    falls back to an unfiltered search.
     """
-    if drug_name is None:
+    rxcui = None
+    match_type = None
+    candidates: list = []
+
+    if drug_name is not None:
+        resolution = resolve_query_drug(drug_name)
+        rxcui = resolution["rxcui"]
+        match_type = resolution["match_type"]
+        candidates = resolution["candidates"]
+
+    results = []
+    if rxcui is not None:
+        results = hybrid_search(
+            query_text, query_embedding=query_embedding, rxcui=rxcui,
+            retriever_top_k=retriever_top_k, top_k=top_k, dsn=dsn,
+        )
+        if not results:
+            rxcui = None
+            match_type = "not_indexed"
+            candidates = []
+
+    if rxcui is None:
         results = hybrid_search(
             query_text, query_embedding=query_embedding, rxcui=None,
             retriever_top_k=retriever_top_k, top_k=top_k, dsn=dsn,
         )
-        return {
-            "results": results, "filter_applied": False,
-            "match_type": None, "candidates": [], "resolution_note": None,
-        }
-
-    resolution = resolve_query_drug(drug_name)
-    rxcui = resolution["rxcui"]
-    match_type = resolution["match_type"]
-    candidates = resolution["candidates"]
-
-    if rxcui is not None and not _rxcui_has_chunks(rxcui, dsn):
-        rxcui = None
-        match_type = "not_indexed"
-        candidates = []
-
-    results = hybrid_search(
-        query_text, query_embedding=query_embedding, rxcui=rxcui,
-        retriever_top_k=retriever_top_k, top_k=top_k, dsn=dsn,
-    )
 
     resolution_note = None
     if match_type == "ambiguous":

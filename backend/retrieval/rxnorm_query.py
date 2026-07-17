@@ -1,9 +1,11 @@
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from backend.pipeline.rxnorm import find_rxcui_approx_candidates, find_rxcui_exact
 
-_DEFAULT_CACHE_PATH = Path("data/rxnorm_cache.json")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_CACHE_PATH = _REPO_ROOT / "data" / "rxnorm_cache.json"
 
 
 def _load_rxnorm_cache(path: Path) -> dict:
@@ -18,6 +20,27 @@ def _load_rxnorm_cache(path: Path) -> dict:
         return {}
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+@lru_cache(maxsize=None)
+def _load_lowered_cache(path: Path) -> dict:
+    """Load and case-fold the RxNorm cache once per path, then reuse from memory.
+
+    The cache file is written once at ingestion time and never changes during
+    a process's lifetime, so re-reading and re-lowering it from disk on every
+    query-time call (resolve_and_search hits this on the live query path) is
+    wasted work with no upside.
+    """
+    cache = _load_rxnorm_cache(path)
+    # Built with a loop (not a dict comprehension) so a resolved entry can
+    # never be shadowed by a differently-cased null duplicate — the first
+    # non-null value seen for a case-folded key wins outright.
+    lowered: dict = {}
+    for k, v in cache.items():
+        key = k.lower()
+        if key not in lowered or lowered[key] is None:
+            lowered[key] = v
+    return lowered
 
 
 def resolve_query_drug(name: str, *, cache_path: Path = _DEFAULT_CACHE_PATH) -> dict:
@@ -44,8 +67,7 @@ def resolve_query_drug(name: str, *, cache_path: Path = _DEFAULT_CACHE_PATH) -> 
     that logic can't distinguish ambiguous from unresolved, so it falls
     through to a live lookup for the richer signal instead.
     """
-    cache = _load_rxnorm_cache(cache_path)
-    lowered = {k.lower(): v for k, v in cache.items()}
+    lowered = _load_lowered_cache(cache_path)
     if name.lower() in lowered:
         cached_rxcui = lowered[name.lower()]
         if cached_rxcui is not None:

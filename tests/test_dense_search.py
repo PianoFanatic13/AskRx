@@ -129,9 +129,22 @@ class TestIndexUsage:
         # Postgres's planner correctly prefers a sequential scan over the
         # index on a handful of rows regardless of query shape, since a seq
         # scan really is cheaper at that size (confirmed: this assertion only
-        # holds against the real ~434k-row corpus, verified manually via
-        # EXPLAIN ANALYZE during Block 2 — see PHASE2_PLAN.md). So this checks
-        # the query text itself, which is what actually matters and is
+        # holds against the real ~434k-row corpus, verified manually via a
+        # live EXPLAIN ANALYZE against the full corpus). So this checks the
+        # query text itself, which is what actually matters and is
         # environment-independent.
         assert "ORDER BY embedding <=>" in dense_module._QUERY
         assert "ORDER BY similarity" not in dense_module._QUERY
+
+    def test_ivfflat_index_exists_on_embedding_column(self):
+        # Guards against schema.sql's CREATE INDEX line being dropped or
+        # changed to a different index type — silent at fixture scale (the
+        # test above still passes) but would degrade every dense_search call
+        # to a full table scan against the real corpus.
+        with psycopg.connect(DSN) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = %s", ("chunks_embedding_idx",))
+                row = cur.fetchone()
+        assert row is not None, "chunks_embedding_idx is missing from the schema"
+        assert "ivfflat" in row[0]
+        assert "embedding" in row[0]
