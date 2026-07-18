@@ -112,12 +112,17 @@ def test_floor_cascades_multiple_short_fragments(mock_ct):
 @patch(_PATCH, side_effect=_wc)
 def test_unmerged_chunk_has_correct_metadata(mock_ct):
     section = _section(_words(200), path=["Adverse Reactions"])
-    chunks = chunk_section(section, setid="abc", drug_name="metformin", rxcui="6809")
+    chunks = chunk_section(
+        section, setid="abc", drug_name="metformin", rxcui="6809",
+        dosage_form="TABLET", route="ORAL",
+    )
     assert len(chunks) == 1
     c = chunks[0]
     assert c["setid"] == "abc"
     assert c["drug_name"] == "metformin"
     assert c["rxcui"] == "6809"
+    assert c["dosage_form"] == "TABLET"
+    assert c["route"] == "ORAL"
     assert c["loinc_code"] == "34071-1"
     assert c["loinc_source"] == "direct"
     assert c["section_title_path"] == ["Adverse Reactions"]
@@ -158,3 +163,11 @@ def test_rxcui_none_propagates(mock_ct):
     section = _section(_words(100))
     chunks = chunk_section(section, setid="s1", drug_name="supplement", rxcui=None)
     assert chunks[0]["rxcui"] is None
+
+
+@patch(_PATCH, side_effect=_wc)
+def test_dosage_form_and_route_default_to_none(mock_ct):
+    section = _section(_words(100))
+    chunks = chunk_section(section, setid="s1", drug_name="drug", rxcui="1")
+    assert chunks[0]["dosage_form"] is None
+    assert chunks[0]["route"] is None

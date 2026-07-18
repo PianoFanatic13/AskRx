@@ -161,6 +161,8 @@ def chunk_section(
     setid: str,
     drug_name: str,
     rxcui: str | None,
+    dosage_form: str | None = None,
+    route: str | None = None,
 ) -> list[dict]:
     """Chunk a parsed section dict and attach full provenance metadata."""
     text = section.get("text", "")
@@ -181,6 +183,8 @@ def chunk_section(
             "setid": setid,
             "drug_name": drug_name,
             "rxcui": rxcui,
+            "dosage_form": dosage_form,
+            "route": route,
             "loinc_code": section["loinc_code"],
             "loinc_source": section["loinc_source"],
             "section_title_path": title_path,

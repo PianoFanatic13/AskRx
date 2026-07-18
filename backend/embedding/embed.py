@@ -16,15 +16,14 @@ _MODEL_ID = "BAAI/bge-large-en-v1.5"
 _DEFAULT_BATCH = 64
 _DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
 
-# dosage_form and route are not currently emitted by chunk_section(), columns will be NULL.
 _INSERT = """
     INSERT INTO chunks (
-        setid, drug_name, rxcui,
+        setid, drug_name, rxcui, dosage_form, route,
         loinc_code, loinc_source, section_title_path, section_type,
         chunk_text, token_count, merged, merged_title_paths,
         embedding
     ) VALUES (
-        %(setid)s, %(drug_name)s, %(rxcui)s,
+        %(setid)s, %(drug_name)s, %(rxcui)s, %(dosage_form)s, %(route)s,
         %(loinc_code)s, %(loinc_source)s, %(section_title_path)s, %(section_type)s,
         %(chunk_text)s, %(token_count)s, %(merged)s, %(merged_title_paths)s,
         %(embedding)s

@@ -264,6 +264,31 @@ def test_pass2_writes_chunks_to_jsonl(tmp_path):
     assert len(lines) == 2
 
 
+def test_pass2_passes_dosage_form_and_route_to_chunk_section(tmp_path):
+    setid = "hhhh"
+    _write_xml(tmp_path / "labels", setid)
+    cache_path = tmp_path / "cache.json"
+    output_path = tmp_path / "out.jsonl"
+    header = _fake_header(setid, ["metformin"], form="TABLET", route="ORAL")
+
+    with (
+        patch(f"{_MODULE}.extract_header", return_value=header),
+        patch(f"{_MODULE}.resolve_rxcui", return_value="6809"),
+        patch(f"{_MODULE}.select_canonical", return_value=[setid]),
+        patch(f"{_MODULE}.select_canonical_no_rxcui", return_value=[]),
+        patch(f"{_MODULE}.parse_label", return_value={"header": header, "sections": [_fake_section()]}),
+        patch(f"{_MODULE}.chunk_section", return_value=[_fake_chunk(setid)]) as mock_chunk_section,
+    ):
+        run_pipeline(
+            labels_dir=tmp_path / "labels",
+            output_path=output_path,
+            rxnorm_cache_path=cache_path,
+        )
+
+    args = mock_chunk_section.call_args.args
+    assert args[-2:] == ("TABLET", "ORAL")
+
+
 def test_chunks_are_valid_json_objects(tmp_path):
     setid = "gggg"
     _write_xml(tmp_path / "labels", setid)

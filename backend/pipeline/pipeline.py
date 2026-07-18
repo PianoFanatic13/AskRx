@@ -122,9 +122,11 @@ def _pass2(
 
             drug_name = label['header'].get('drug_name') or setid
             rxcui = setid_to_rxcui.get(setid)
+            dosage_form = label['header'].get('dosage_form')
+            route = label['header'].get('route')
 
             for section in label['sections']:
-                for chunk in chunk_section(section, setid, drug_name, rxcui):
+                for chunk in chunk_section(section, setid, drug_name, rxcui, dosage_form, route):
                     out.write(json.dumps(chunk, ensure_ascii=False) + '\n')
                     chunks_written += 1
 
