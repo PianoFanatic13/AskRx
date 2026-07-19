@@ -11,6 +11,10 @@ dependencies = [
     "transformers>=4.40",
     "python-dotenv>=1.0",
     "tqdm>=4.66",
+    "langgraph>=0.2",
+    "langchain-groq>=0.2",
+    "langchain-ollama>=0.2",
+    "langchain-google-genai>=2.0",
 ]
 
 [project.optional-dependencies]
