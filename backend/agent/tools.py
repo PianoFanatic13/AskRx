@@ -1,5 +1,3 @@
-from typing import Optional
-
 from langchain_core.tools import tool
 
 from backend.retrieval.hybrid import hybrid_search
@@ -8,38 +6,73 @@ from backend.retrieval.text_search import get_section
 
 _DRUG_INTERACTIONS_LOINC = "34073-7"
 
+_KEPT_CHUNK_FIELDS = {"chunk_text", "setid", "loinc_code", "section_title_path", "drug_name", "section_type"}
+
+
+def _trim_chunks(chunks: list[dict]) -> list[dict]:
+    """Drop fields the LLM doesn't need to answer or cite correctly (id, rxcui, token_count, ranking scores)."""
+    return [{k: v for k, v in chunk.items() if k in _KEPT_CHUNK_FIELDS} for chunk in chunks]
+
 
 @tool
 def resolve_drug_name(name: str) -> dict:
     """Resolve a drug name (brand or generic, possibly misspelled) to its RxNorm identifier (RXCUI).
 
-    Call this first for any drug named in the query, before retrieve_drug_info
-    or retrieve_interactions, so those calls can be filtered to the right drug.
-    match_type is "exact"/"approx"/"cached" when resolved, "ambiguous" when
-    multiple drugs could match (ask the user which one before proceeding), or
-    "unresolved" when it's not a recognized drug (proceed without a filter).
+    Only needed when you want to check a name before deciding what to do with
+    it (e.g. sorting out several drugs in one query) — retrieve_drug_info and
+    retrieve_interactions already resolve names internally. match_type is
+    "exact"/"approx"/"cached" when resolved, "ambiguous" when multiple drugs
+    could match (ask the user which one), or "unresolved" when it's not a
+    recognized drug.
     """
     return resolve_query_drug(name)
 
 
 @tool
-def retrieve_drug_info(query_text: str, rxcui: Optional[str] = None) -> list[dict]:
+def retrieve_drug_info(query_text: str, drug_name: str) -> dict:
     """Retrieve relevant sections from FDA drug label(s) to answer a question about a drug.
 
-    Covers indications, warnings, dosing, adverse reactions, etc. Pass the
-    rxcui from resolve_drug_name when available to filter to that specific
-    drug; omit it for an unfiltered search. Each result includes setid,
-    loinc_code, and section_title_path — cite these when answering.
+    Covers indications, warnings, dosing, adverse reactions, etc. Resolves
+    drug_name internally, so you don't need to call resolve_drug_name first.
+
+    Returns {"results": [...], "match_type": str, "candidates": [...]}. If
+    match_type is "ambiguous", results is empty and candidates lists the
+    possible drugs — ask the user which one instead of guessing. Otherwise
+    each result includes setid, loinc_code, and section_title_path — cite
+    these when answering.
     """
-    return hybrid_search(query_text, rxcui=rxcui)
+    resolution = resolve_query_drug(drug_name)
+    if resolution["match_type"] == "ambiguous":
+        return {"results": [], "match_type": "ambiguous", "candidates": resolution["candidates"]}
+
+    rxcui = resolution["rxcui"]
+    results = hybrid_search(query_text, rxcui=rxcui)
+    match_type = resolution["match_type"]
+    if rxcui is not None and not results:
+        # Resolved to a real drug, but it isn't represented in the indexed corpus.
+        results = hybrid_search(query_text, rxcui=None)
+        match_type = "not_indexed"
+
+    return {"results": _trim_chunks(results), "match_type": match_type, "candidates": []}
 
 
 @tool
-def retrieve_interactions(rxcui: str) -> list[dict]:
+def retrieve_interactions(drug_name: str) -> dict:
     """Fetch the exact Drug Interactions section from a specific drug's label.
 
-    Requires a resolved rxcui (call resolve_drug_name first). An empty result
-    means the label doesn't mention interactions — report this as "the label
+    Resolves drug_name internally, so you don't need to call resolve_drug_name
+    first. Returns {"results": [...], "match_type": str, "candidates": [...]}.
+    If match_type is "ambiguous", ask the user which drug they meant instead
+    of guessing. If "unresolved", the drug couldn't be identified at all, so
+    no interactions lookup was possible. An empty results list otherwise means
+    the label doesn't mention interactions — report this as "the label
     doesn't discuss this," never as "these drugs don't interact."
     """
-    return get_section(rxcui, _DRUG_INTERACTIONS_LOINC)
+    resolution = resolve_query_drug(drug_name)
+    if resolution["match_type"] == "ambiguous":
+        return {"results": [], "match_type": "ambiguous", "candidates": resolution["candidates"]}
+    if resolution["rxcui"] is None:
+        return {"results": [], "match_type": "unresolved", "candidates": []}
+
+    results = get_section(resolution["rxcui"], _DRUG_INTERACTIONS_LOINC)
+    return {"results": _trim_chunks(results), "match_type": resolution["match_type"], "candidates": []}
