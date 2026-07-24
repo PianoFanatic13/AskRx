@@ -8,12 +8,20 @@ Resolves the drug name itself, so pass the name directly.
 - retrieve_interactions: specifically for drug interaction questions. Also resolves the name itself.
 - resolve_drug_name: optional — only needed if you want to check a name before deciding what to do with \
 it (e.g. sorting out several drugs in one query before retrieving anything).
-If the query names more than one drug, call the tools once per drug — do not merge multiple drugs into \
-a single search.
 
 Both retrieve_drug_info and retrieve_interactions return {"results": [...], "match_type": str, \
 "candidates": [...]}. If match_type is "ambiguous", results will be empty and candidates lists the \
 possible drugs — stop and ask the user which one they meant rather than guessing or picking one yourself.
+
+## Multiple drugs
+Call the relevant tool once per named drug — never merge multiple drugs into one query_text. For a \
+two-drug interaction question ("can I take X with Y?"), call retrieve_interactions once for each drug \
+and check whether either label's interactions section mentions the other drug or its class. When all \
+the drugs are named upfront, request their tool calls together in the same turn rather than one at a \
+time. Once results are back, synthesize them into one coherent answer that actually addresses the \
+combined question — don't just staple two separate per-drug summaries together. If only one label \
+discusses the interaction, say so explicitly, and keep each citation attributed to its correct source \
+drug.
 
 ## Plain language
 Retrieved label text is real clinical language (e.g. "hepatotoxicity," "contraindicated," "concomitant \

@@ -7,6 +7,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -96,16 +98,29 @@ def build_graph() -> CompiledStateGraph:
     builder.add_edge("generate_structured_answer", "post_process")
     builder.add_edge("post_process", END)
 
-    return builder.compile()
+    serde = JsonPlusSerializer(allowed_msgpack_modules=[AgentAnswer, Citation])
+    return builder.compile(checkpointer=MemorySaver(serde=serde))
 
 
 _graph: Optional[CompiledStateGraph] = None
 
 
-def ask(query: str) -> AgentAnswer:
-    """Run a single-turn query through the agent, building the graph once and reusing it after."""
+def ask(query: str, thread_id: str) -> AgentAnswer:
+    """Run a query through the agent, building the graph once and reusing it after.
+
+    thread_id scopes conversation memory (see build_graph's checkpointer) -
+    reuse the same value across calls to continue a conversation, or pass a
+    fresh one for an unrelated query.
+    """
     global _graph
     if _graph is None:
         _graph = build_graph()
-    result = _graph.invoke({"messages": [HumanMessage(query)]})
+    config = {"configurable": {"thread_id": thread_id}}
+    result = _graph.invoke({"messages": [HumanMessage(query)]}, config)
     return result["structured_response"]
+
+
+def delete_thread(thread_id: str) -> None:
+    """Delete a thread's checkpointed state, mainly for test cleanup."""
+    if _graph is not None:
+        _graph.checkpointer.delete_thread(thread_id)
