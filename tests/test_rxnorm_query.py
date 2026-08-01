@@ -16,6 +16,7 @@ class TestExactAndApproxResolution:
         with (
             patch(f"{_MODULE}.find_rxcui_exact", return_value="6809") as mock_exact,
             patch(f"{_MODULE}.find_rxcui_approx_candidates") as mock_approx,
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value=None),
         ):
             result = resolve_query_drug("metformin", cache_path=tmp_path / "missing.json")
 
@@ -30,6 +31,7 @@ class TestExactAndApproxResolution:
                 f"{_MODULE}.find_rxcui_approx_candidates",
                 return_value=[{"name": "lisinopril", "rxcui": "29046"}],
             ),
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value=None),
         ):
             result = resolve_query_drug("lisinipril", cache_path=tmp_path / "missing.json")
 
@@ -58,6 +60,53 @@ class TestExactAndApproxResolution:
         assert result == {"rxcui": None, "match_type": "unresolved", "candidates": []}
 
 
+class TestIngredientNormalization:
+    def test_exact_match_normalized_to_ingredient_rxcui(self, tmp_path):
+        with (
+            patch(f"{_MODULE}.find_rxcui_exact", return_value="1364436"),
+            patch(f"{_MODULE}.find_rxcui_approx_candidates") as mock_approx,
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value="1364430") as mock_ingredient,
+        ):
+            result = resolve_query_drug("Eliquis", cache_path=tmp_path / "missing.json")
+
+        assert result == {"rxcui": "1364430", "match_type": "exact", "candidates": []}
+        mock_ingredient.assert_called_once_with("1364436")
+        mock_approx.assert_not_called()
+
+    def test_approx_match_normalized_to_ingredient_rxcui(self, tmp_path):
+        with (
+            patch(f"{_MODULE}.find_rxcui_exact", return_value=None),
+            patch(
+                f"{_MODULE}.find_rxcui_approx_candidates",
+                return_value=[{"name": "Eliquis", "rxcui": "1364436"}],
+            ),
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value="1364430") as mock_ingredient,
+        ):
+            result = resolve_query_drug("Elikwis", cache_path=tmp_path / "missing.json")
+
+        assert result == {"rxcui": "1364430", "match_type": "approx", "candidates": []}
+        mock_ingredient.assert_called_once_with("1364436")
+
+    def test_no_ingredient_relation_falls_back_to_original_rxcui(self, tmp_path):
+        with (
+            patch(f"{_MODULE}.find_rxcui_exact", return_value="6809"),
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value=None),
+        ):
+            result = resolve_query_drug("metformin", cache_path=tmp_path / "missing.json")
+
+        assert result == {"rxcui": "6809", "match_type": "exact", "candidates": []}
+
+    def test_cached_hit_skips_ingredient_normalization(self, tmp_path):
+        cache_path = tmp_path / "cache.json"
+        _write_cache(cache_path, {"apixaban": "1364430"})
+
+        with patch(f"{_MODULE}.find_ingredient_rxcui") as mock_ingredient:
+            result = resolve_query_drug("apixaban", cache_path=cache_path)
+
+        assert result == {"rxcui": "1364430", "match_type": "cached", "candidates": []}
+        mock_ingredient.assert_not_called()
+
+
 class TestCache:
     def test_cache_hit_skips_network_entirely(self, tmp_path):
         cache_path = tmp_path / "cache.json"
@@ -80,6 +129,7 @@ class TestCache:
         with (
             patch(f"{_MODULE}.find_rxcui_exact", return_value="5555") as mock_exact,
             patch(f"{_MODULE}.find_rxcui_approx_candidates") as mock_approx,
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value=None),
         ):
             result = resolve_query_drug("someherb", cache_path=cache_path)
 
@@ -91,7 +141,10 @@ class TestCache:
         cache_path = tmp_path / "cache.json"
         _write_cache(cache_path, {"ibuprofen": "5640"})
 
-        with patch(f"{_MODULE}.find_rxcui_exact", return_value="6809") as mock_exact:
+        with (
+            patch(f"{_MODULE}.find_rxcui_exact", return_value="6809") as mock_exact,
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value=None),
+        ):
             result = resolve_query_drug("metformin", cache_path=cache_path)
 
         assert result == {"rxcui": "6809", "match_type": "exact", "candidates": []}
@@ -112,7 +165,10 @@ class TestCache:
         mock_approx.assert_not_called()
 
     def test_missing_cache_file_falls_through_without_error(self, tmp_path):
-        with patch(f"{_MODULE}.find_rxcui_exact", return_value="6809") as mock_exact:
+        with (
+            patch(f"{_MODULE}.find_rxcui_exact", return_value="6809") as mock_exact,
+            patch(f"{_MODULE}.find_ingredient_rxcui", return_value=None),
+        ):
             result = resolve_query_drug("metformin", cache_path=tmp_path / "does_not_exist.json")
 
         assert result == {"rxcui": "6809", "match_type": "exact", "candidates": []}

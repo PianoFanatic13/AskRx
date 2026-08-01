@@ -122,6 +122,24 @@ def find_rxcui_approx(name: str) -> Optional[str]:
     return None
 
 
+def find_ingredient_rxcui(rxcui: str) -> Optional[str]:
+    """Return the ingredient-level (IN) RXCUI related to rxcui, or None if there isn't one.
+
+    A name lookup for a brand (e.g. "Eliquis") resolves to a brand-specific
+    concept distinct from the ingredient-level concept ingestion indexes
+    chunks under, since ingestion resolves via the parsed ingredient name
+    string (e.g. "apixaban"), which naturally lands on the IN concept.
+    Calling this on an rxcui that's already an IN concept returns itself.
+    """
+    data = _get(f"{BASE}/rxcui/{rxcui}/related.json", {"tty": "IN"})
+    for group in data.get("relatedGroup", {}).get("conceptGroup") or []:
+        for prop in group.get("conceptProperties") or []:
+            in_rxcui = prop.get("rxcui")
+            if in_rxcui:
+                return in_rxcui
+    return None
+
+
 def resolve_rxcui(name: str) -> Optional[str]:
     """Resolve ingredient name to RXCUI: exact first, approximate fallback."""
     rxcui = find_rxcui_exact(name)

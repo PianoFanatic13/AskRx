@@ -2,7 +2,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-from backend.pipeline.rxnorm import find_rxcui_approx_candidates, find_rxcui_exact
+from backend.pipeline.rxnorm import find_ingredient_rxcui, find_rxcui_approx_candidates, find_rxcui_exact
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CACHE_PATH = _REPO_ROOT / "data" / "rxnorm_cache.json"
@@ -66,6 +66,15 @@ def resolve_query_drug(name: str, *, cache_path: Path = _DEFAULT_CACHE_PATH) -> 
     None (a known ingestion-time failure) isn't trusted as a final answer —
     that logic can't distinguish ambiguous from unresolved, so it falls
     through to a live lookup for the richer signal instead.
+
+    A live exact/approx match is normalized to its ingredient-level (IN)
+    RXCUI via find_ingredient_rxcui before being returned. A brand-name
+    query (e.g. "Eliquis") otherwise resolves to a brand-specific concept
+    distinct from the IN concept ingestion indexes chunks under, since
+    ingestion resolves via the parsed ingredient name string — filtering
+    retrieval on the unnormalized brand rxcui would silently match nothing.
+    Cached entries skip this step: the cache is built from ingredient name
+    lookups at ingestion time, so it's already IN-level.
     """
     lowered = _load_lowered_cache(cache_path)
     if name.lower() in lowered:
@@ -75,11 +84,12 @@ def resolve_query_drug(name: str, *, cache_path: Path = _DEFAULT_CACHE_PATH) -> 
 
     rxcui = find_rxcui_exact(name)
     if rxcui is not None:
-        return {"rxcui": rxcui, "match_type": "exact", "candidates": []}
+        return {"rxcui": find_ingredient_rxcui(rxcui) or rxcui, "match_type": "exact", "candidates": []}
 
     candidates = find_rxcui_approx_candidates(name)
     if len(candidates) == 1:
-        return {"rxcui": candidates[0]["rxcui"], "match_type": "approx", "candidates": []}
+        rxcui = candidates[0]["rxcui"]
+        return {"rxcui": find_ingredient_rxcui(rxcui) or rxcui, "match_type": "approx", "candidates": []}
     if len(candidates) > 1:
         return {"rxcui": None, "match_type": "ambiguous", "candidates": candidates}
     return {"rxcui": None, "match_type": "unresolved", "candidates": []}

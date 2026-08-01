@@ -28,9 +28,7 @@ Thumbs.db
 CLAUDE.md
 
 # Misc
-PHASE1_PLAN.md
-PHASE2_PLAN.md
-PHASE3_PLAN.md
+plans/
 AskRx.md
 tests/test_parser.py
 

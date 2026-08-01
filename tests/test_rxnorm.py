@@ -5,7 +5,7 @@ Skipped in normal test runs to avoid network dependency.
 """
 import re
 import pytest
-from backend.pipeline.rxnorm import resolve_rxcui, set_failure_log
+from backend.pipeline.rxnorm import find_ingredient_rxcui, resolve_rxcui, set_failure_log
 
 RXCUI_RE = re.compile(r"^\d+$")
 
@@ -57,3 +57,19 @@ class TestResolveRxcui:
         assert ts.endswith("Z")
         # Reset so other tests aren't affected
         set_failure_log(None)
+
+
+@pytest.mark.integration
+class TestFindIngredientRxcui:
+    def test_brand_concept_resolves_to_ingredient_concept(self):
+        # Eliquis (brand) -> apixaban (ingredient)
+        result = find_ingredient_rxcui("1364436")
+        assert result == "1364430"
+
+    def test_ingredient_concept_resolves_to_itself(self):
+        result = find_ingredient_rxcui("1364430")
+        assert result == "1364430"
+
+    def test_unknown_rxcui_returns_none(self):
+        result = find_ingredient_rxcui("0")
+        assert result is None
