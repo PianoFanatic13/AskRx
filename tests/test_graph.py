@@ -87,7 +87,9 @@ class TestConversationMemory:
 
         contents = [m.content for m in result["messages"]]
         assert "first turn" in contents
+        assert "first response" in contents
         assert "second turn" in contents
+        assert "second response" in contents
 
     def test_different_thread_ids_are_isolated(self):
         final_msg = AIMessage(content="response")
