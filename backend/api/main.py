@@ -39,7 +39,11 @@ def chat(request: ChatRequest):
     try:
         result = ask(request.message, thread_id)
     except Exception as e:
-        return JSONResponse(status_code=502, content={"error": f"agent failed: {e}"})
+        return JSONResponse(
+            status_code=503,
+            content={"error": f"agent failed: {e}"},
+            headers={"Retry-After": "10"},
+        )
     return ChatResponse(
         answer=result.answer,
         citations=result.citations,

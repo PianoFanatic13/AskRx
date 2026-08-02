@@ -1,11 +1,11 @@
 import os
 from typing import Optional
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
@@ -20,24 +20,21 @@ from backend.agent.tools import resolve_drug_name, retrieve_drug_info, retrieve_
 load_dotenv()
 
 _DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
-_DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 _DEFAULT_OLLAMA_MODEL = "llama3.1"
 
 _TOOLS = [resolve_drug_name, retrieve_drug_info, retrieve_interactions]
 
 
 def get_llm() -> BaseChatModel:
-    """Return a chat model instance, backend selected via LLM_BACKEND (gemini|groq|ollama)."""
+    """Return a chat model instance, backend selected via LLM_BACKEND (gemini|ollama)."""
     backend = os.getenv("LLM_BACKEND", "gemini")
 
     if backend == "gemini":
         return ChatGoogleGenerativeAI(model=os.getenv("GEMINI_MODEL", _DEFAULT_GEMINI_MODEL))
-    if backend == "groq":
-        return ChatGroq(model=os.getenv("GROQ_MODEL", _DEFAULT_GROQ_MODEL))
     if backend == "ollama":
         return ChatOllama(model=os.getenv("OLLAMA_MODEL", _DEFAULT_OLLAMA_MODEL))
 
-    raise ValueError(f"Unknown LLM_BACKEND: {backend!r} (expected 'gemini', 'groq', or 'ollama')")
+    raise ValueError(f"Unknown LLM_BACKEND: {backend!r} (expected 'gemini' or 'ollama')")
 
 
 class Citation(BaseModel):
@@ -118,6 +115,22 @@ def ask(query: str, thread_id: str) -> AgentAnswer:
     config = {"configurable": {"thread_id": thread_id}}
     result = _graph.invoke({"messages": [HumanMessage(query)]}, config)
     return result["structured_response"]
+
+
+def ask_with_trace(query: str, thread_id: str) -> dict:
+    """Like ask(), but also returns the raw message list and a run_id.
+
+    For eval tooling that needs the full ReAct trace (tool calls, not just
+    the final answer) and a LangSmith run to link to - not used by the
+    CLI/API, which only need the final AgentAnswer.
+    """
+    global _graph
+    if _graph is None:
+        _graph = build_graph()
+    run_id = str(uuid4())
+    config = {"configurable": {"thread_id": thread_id}, "run_id": run_id}
+    result = _graph.invoke({"messages": [HumanMessage(query)]}, config)
+    return {"answer": result["structured_response"], "messages": result["messages"], "run_id": run_id}
 
 
 def delete_thread(thread_id: str) -> None:

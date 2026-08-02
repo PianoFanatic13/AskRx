@@ -254,7 +254,11 @@ def extract_header(xml_path: str) -> dict:
                 marketing_category = code_el.get("code")
                 break
 
+        primary_mp = None
         for mp in product_section.iter(f"{{{NS}}}manufacturedProduct"):
+            if primary_mp is None:
+                primary_mp = mp
+
             if drug_name is None:
                 name_el = mp.find(f"{{{NS}}}name")
                 if name_el is None:
@@ -271,7 +275,16 @@ def extract_header(xml_path: str) -> dict:
                 if rc is not None:
                     route = rc.get("displayName")
 
-        for ing in product_section.iter(f"{{{NS}}}ingredient"):
+        # Kits (e.g. Humira) nest a <part><partProduct> per component inside the primary
+        # manufacturedProduct, each with its own <ingredient> tags -- including accessories
+        # like an alcohol prep pad, which also carry classCode ACTIB. The drug itself is
+        # always the first part, so scope to it instead of the whole manufacturedProduct.
+        ingredient_scope = primary_mp if primary_mp is not None else product_section
+        if ingredient_scope is not None:
+            first_part_product = ingredient_scope.find(f".//{{{NS}}}partProduct")
+            if first_part_product is not None:
+                ingredient_scope = first_part_product
+        for ing in ingredient_scope.iter(f"{{{NS}}}ingredient"):
             if ing.get("classCode") in ACTIVE_CLASS_CODES:
                 sub = ing.find(f".//{{{NS}}}ingredientSubstance")
                 if sub is not None:
