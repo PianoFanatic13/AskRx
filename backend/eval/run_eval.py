@@ -1,12 +1,14 @@
 import argparse
 import json
+import os
 import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langsmith import Client
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="ragas")
@@ -31,13 +33,23 @@ from backend.agent.graph import ask_with_trace
 
 # Judge LLM/embeddings are deliberately not the agent's own Gemini/BGE stack -
 # grading a model with itself (or the same embedding space its retrieval was
-# built on) risks self-preference bias and shared blind spots.
-_JUDGE_LLM = LangchainLLMWrapper(ChatOllama(model="llama3.1"))
+# built on) risks self-preference bias and shared blind spots. Judge LLM runs
+# via OpenRouter (requires OPENROUTER_API_KEY) rather than locally, for judge
+# capacity/reliability this model needs - see PHASE4_PLAN.md Block 2 notes for
+# why (judge model went through a few iterations to get here).
+_JUDGE_LLM = LangchainLLMWrapper(
+    ChatOpenAI(
+        model="nvidia/nemotron-3-super-120b-a12b:free",
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
+)
 _JUDGE_EMBEDDINGS = LangchainEmbeddingsWrapper(GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001"))
 
-# Ollama serves one local model, not built for the default 16-way concurrency;
-# local CPU inference also needs more time per call than a hosted API.
-_RUN_CONFIG = RunConfig(timeout=600, max_workers=2)
+# OpenRouter's free-tier cap is 20 requests/minute account-wide (not per model) -
+# keep concurrency modest so we don't burst past it and rely on RunConfig's
+# built-in retry/backoff for the rest.
+_RUN_CONFIG = RunConfig(timeout=300, max_workers=3)
 
 
 def _extract_contexts(messages: list) -> list[str]:
@@ -146,6 +158,9 @@ def run_eval(dataset_path: Path, report_path: Path) -> dict:
     multi_scores = multi_result.to_pandas().to_dict(orient="records")
 
     report = {
+        "run_at": datetime.now(timezone.utc).isoformat(),
+        "judge_model": _JUDGE_LLM.langchain_llm.model_name,
+        "dataset_path": str(dataset_path),
         "queries": [
             {
                 "id": q["id"],
@@ -159,18 +174,26 @@ def run_eval(dataset_path: Path, report_path: Path) -> dict:
         "single_turn_summary": single_result._repr_dict if hasattr(single_result, "_repr_dict") else dict(single_result),
         "multi_turn_summary": multi_result._repr_dict if hasattr(multi_result, "_repr_dict") else dict(multi_result),
     }
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     return report
+
+
+def _default_report_path() -> Path:
+    """Timestamped path so repeat runs build up a history instead of overwriting each other."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return Path("backend/eval/reports") / f"report_{ts}.json"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=Path, default=Path("tests/eval/dataset.json"))
-    parser.add_argument("--report", type=Path, default=Path("backend/eval/report.json"))
+    parser.add_argument("--report", type=Path, default=None, help="Defaults to a timestamped file under backend/eval/reports/")
     args = parser.parse_args()
 
-    run_eval(args.dataset, args.report)
-    print(f"Report written to {args.report}")
+    report_path = args.report or _default_report_path()
+    run_eval(args.dataset, report_path)
+    print(f"Report written to {report_path}")
 
 
 if __name__ == "__main__":
