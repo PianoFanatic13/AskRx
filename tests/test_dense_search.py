@@ -80,14 +80,14 @@ class TestTopK:
 
 class TestQueryEmbeddingBypass:
     def test_supplying_query_embedding_skips_model_load(self, seeded_dense_chunks, monkeypatch):
-        # If dense_search touched the real model here, this would fail (or hang
-        # downloading BGE-large) since _get_model is poisoned to raise.
+        # If dense_search touched the real API here, this would fail (or hang
+        # on a live HF call) since _embed_query is poisoned to raise.
         import backend.retrieval.dense as dense_module
 
         def _fail(*args, **kwargs):
-            raise AssertionError("model should not be loaded when query_embedding is supplied")
+            raise AssertionError("HF API should not be called when query_embedding is supplied")
 
-        monkeypatch.setattr(dense_module, "_get_model", _fail)
+        monkeypatch.setattr(dense_module, "_embed_query", _fail)
         results = dense_search("irrelevant text", query_embedding=QUERY_VECTOR, rxcui="1001", top_k=5)
         assert len(results) > 0
 

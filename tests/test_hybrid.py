@@ -96,9 +96,9 @@ class TestHybridSearchDB:
         import backend.retrieval.dense as dense_module
 
         def _fail(*args, **kwargs):
-            raise AssertionError("model should not be loaded when query_embedding is supplied")
+            raise AssertionError("HF API should not be called when query_embedding is supplied")
 
-        monkeypatch.setattr(dense_module, "_get_model", _fail)
+        monkeypatch.setattr(dense_module, "_embed_query", _fail)
         results = hybrid_search(
             "zqlorafenib headache", query_embedding=QUERY_VECTOR, rxcui="7001", top_k=5
         )
