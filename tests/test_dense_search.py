@@ -103,10 +103,9 @@ class TestRobustness:
             "unused", query_embedding=QUERY_VECTOR, rxcui="'; DROP TABLE chunks; --", top_k=5
         )
         assert results == []
-        with psycopg.connect(DSN) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT to_regclass('chunks')")
-                assert cur.fetchone()[0] == "chunks"
+        with psycopg.connect(DSN) as conn, conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('chunks')")
+            assert cur.fetchone()[0] == "chunks"
 
 
 class TestResultShape:
@@ -141,10 +140,9 @@ class TestIndexUsage:
         # changed to a different index type — silent at fixture scale (the
         # test above still passes) but would degrade every dense_search call
         # to a full table scan against the real corpus.
-        with psycopg.connect(DSN) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = %s", ("chunks_embedding_idx",))
-                row = cur.fetchone()
+        with psycopg.connect(DSN) as conn, conn.cursor() as cur:
+            cur.execute("SELECT indexdef FROM pg_indexes WHERE indexname = %s", ("chunks_embedding_idx",))
+            row = cur.fetchone()
         assert row is not None, "chunks_embedding_idx is missing from the schema"
         assert "ivfflat" in row[0]
         assert "embedding" in row[0]

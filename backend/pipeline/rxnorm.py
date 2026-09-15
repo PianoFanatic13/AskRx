@@ -1,15 +1,15 @@
-import time
 import logging
-import requests
-from datetime import datetime, timezone
+import time
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
+
+import requests
 
 log = logging.getLogger(__name__)
 
 BASE = "https://rxnav.nlm.nih.gov/REST"
 
-_failure_log_path: Optional[Path] = None
+_failure_log_path: Path | None = None
 
 
 def set_failure_log(path) -> None:
@@ -24,7 +24,7 @@ def set_failure_log(path) -> None:
 def _record_failure(name: str) -> None:
     if _failure_log_path is None:
         return
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     with _failure_log_path.open("a", encoding="utf-8") as f:
         f.write(f"{ts}\t{name}\n")
 
@@ -71,7 +71,7 @@ def _get(url: str, params: dict) -> dict:
                 raise
 
 
-def find_rxcui_exact(name: str) -> Optional[str]:
+def find_rxcui_exact(name: str) -> str | None:
     """Return RXCUI for an exact ingredient name match, or None."""
     data = _get(f"{BASE}/rxcui.json", {"name": name, "allsrc": "0", "search": "1"})
     rxcui = data.get("idGroup", {}).get("rxnormId", [])
@@ -108,7 +108,7 @@ def find_rxcui_approx_candidates(name: str) -> list[dict]:
     return candidates
 
 
-def find_rxcui_approx(name: str) -> Optional[str]:
+def find_rxcui_approx(name: str) -> str | None:
     """Return RXCUI via approximate match when exact lookup fails.
 
     Only resolves when the spelling suggestions point to exactly one real
@@ -122,7 +122,7 @@ def find_rxcui_approx(name: str) -> Optional[str]:
     return None
 
 
-def find_ingredient_rxcui(rxcui: str) -> Optional[str]:
+def find_ingredient_rxcui(rxcui: str) -> str | None:
     """Return the ingredient-level (IN) RXCUI related to rxcui, or None if there isn't one.
 
     A name lookup for a brand (e.g. "Eliquis") resolves to a brand-specific
@@ -140,7 +140,7 @@ def find_ingredient_rxcui(rxcui: str) -> Optional[str]:
     return None
 
 
-def resolve_rxcui(name: str) -> Optional[str]:
+def resolve_rxcui(name: str) -> str | None:
     """Resolve ingredient name to RXCUI: exact first, approximate fallback."""
     rxcui = find_rxcui_exact(name)
     if rxcui:

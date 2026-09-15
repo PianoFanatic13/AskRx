@@ -41,38 +41,38 @@ def seeded_chunks():
         return f"{_TEST_PREFIX}{run_id}-{n}"
 
     rows = [
-        dict(
-            setid=sid(1), drug_name="drugavir", rxcui="1001", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Zqlorafenib headache is a common adverse reaction. "
+        {
+            "setid": sid(1), "drug_name": "drugavir", "rxcui": "1001", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Zqlorafenib headache is a common adverse reaction. "
                         "Zqlorafenib headache may also occur with dizziness.",
-            token_count=16,
-        ),
-        dict(
-            setid=sid(2), drug_name="drugavir", rxcui="1001", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Patients using zqlorafenib may report headache in rare cases.",
-            token_count=10,
-        ),
-        dict(
-            setid=sid(3), drug_name="drugbex", rxcui="2002", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Zqlorafenib headache is a common adverse reaction. "
+            "token_count": 16,
+        },
+        {
+            "setid": sid(2), "drug_name": "drugavir", "rxcui": "1001", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Patients using zqlorafenib may report headache in rare cases.",
+            "token_count": 10,
+        },
+        {
+            "setid": sid(3), "drug_name": "drugbex", "rxcui": "2002", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Zqlorafenib headache is a common adverse reaction. "
                         "Zqlorafenib headache may also occur with dizziness.",
-            token_count=16,
-        ),
-        dict(
-            setid=sid(4), drug_name="drugcin", rxcui="3003", loinc_code="34084-4",
-            section_type="standard",
-            chunk_text="Common zqlorafenib side effects include nausea and fatigue.",
-            token_count=9,
-        ),
-        dict(
-            setid=sid(5), drug_name="drugdol", rxcui="4004", loinc_code="34090-1",
-            section_type="standard",
-            chunk_text="Store zqlorafenib away from light and moisture at room temperature.",
-            token_count=11,
-        ),
+            "token_count": 16,
+        },
+        {
+            "setid": sid(4), "drug_name": "drugcin", "rxcui": "3003", "loinc_code": "34084-4",
+            "section_type": "standard",
+            "chunk_text": "Common zqlorafenib side effects include nausea and fatigue.",
+            "token_count": 9,
+        },
+        {
+            "setid": sid(5), "drug_name": "drugdol", "rxcui": "4004", "loinc_code": "34090-1",
+            "section_type": "standard",
+            "chunk_text": "Store zqlorafenib away from light and moisture at room temperature.",
+            "token_count": 11,
+        },
     ]
 
     with psycopg.connect(DSN) as conn:
@@ -146,31 +146,31 @@ def seeded_dense_chunks():
         return f"{_TEST_PREFIX}{run_id}-{n}"
 
     rows = [
-        dict(
-            setid=sid(1), drug_name="drugavir", rxcui="1001", loinc_code="34071-1",
-            section_type="standard", chunk_text="zqlorafenib fixture row 0",
-            token_count=4, embedding=VEC_CLOSE,
-        ),
-        dict(
-            setid=sid(2), drug_name="drugavir", rxcui="1001", loinc_code="34071-1",
-            section_type="standard", chunk_text="zqlorafenib fixture row 1",
-            token_count=4, embedding=VEC_FAR,
-        ),
-        dict(
-            setid=sid(3), drug_name="drugbex", rxcui="2002", loinc_code="34071-1",
-            section_type="standard", chunk_text="zqlorafenib fixture row 2",
-            token_count=4, embedding=VEC_CLOSE,
-        ),
-        dict(
-            setid=sid(4), drug_name="drugcin", rxcui="3003", loinc_code="34084-4",
-            section_type="standard", chunk_text="zqlorafenib fixture row 3",
-            token_count=4, embedding=VEC_ORTHOGONAL,
-        ),
-        dict(
-            setid=sid(5), drug_name="drugdol", rxcui="4004", loinc_code="34090-1",
-            section_type="standard", chunk_text="zqlorafenib fixture row 4",
-            token_count=4, embedding=VEC_OPPOSITE,
-        ),
+        {
+            "setid": sid(1), "drug_name": "drugavir", "rxcui": "1001", "loinc_code": "34071-1",
+            "section_type": "standard", "chunk_text": "zqlorafenib fixture row 0",
+            "token_count": 4, "embedding": VEC_CLOSE,
+        },
+        {
+            "setid": sid(2), "drug_name": "drugavir", "rxcui": "1001", "loinc_code": "34071-1",
+            "section_type": "standard", "chunk_text": "zqlorafenib fixture row 1",
+            "token_count": 4, "embedding": VEC_FAR,
+        },
+        {
+            "setid": sid(3), "drug_name": "drugbex", "rxcui": "2002", "loinc_code": "34071-1",
+            "section_type": "standard", "chunk_text": "zqlorafenib fixture row 2",
+            "token_count": 4, "embedding": VEC_CLOSE,
+        },
+        {
+            "setid": sid(4), "drug_name": "drugcin", "rxcui": "3003", "loinc_code": "34084-4",
+            "section_type": "standard", "chunk_text": "zqlorafenib fixture row 3",
+            "token_count": 4, "embedding": VEC_ORTHOGONAL,
+        },
+        {
+            "setid": sid(5), "drug_name": "drugdol", "rxcui": "4004", "loinc_code": "34090-1",
+            "section_type": "standard", "chunk_text": "zqlorafenib fixture row 4",
+            "token_count": 4, "embedding": VEC_OPPOSITE,
+        },
     ]
 
     with psycopg.connect(DSN) as conn:
@@ -210,31 +210,31 @@ def seeded_section_chunks():
         return f"{_TEST_PREFIX}{run_id}-{n}"
 
     rows = [
-        dict(
-            setid=sid(1), drug_name="drugsec", rxcui="9001", loinc_code="34071-1",
-            section_type="standard", chunk_text="Zqlorafenib section chunk 1 of 3.",
-            token_count=6,
-        ),
-        dict(
-            setid=sid(2), drug_name="drugsec", rxcui="9001", loinc_code="34071-1",
-            section_type="standard", chunk_text="Zqlorafenib section chunk 2 of 3.",
-            token_count=6,
-        ),
-        dict(
-            setid=sid(3), drug_name="drugsec", rxcui="9001", loinc_code="34071-1",
-            section_type="standard", chunk_text="Zqlorafenib section chunk 3 of 3.",
-            token_count=6,
-        ),
-        dict(
-            setid=sid(4), drug_name="drugsex", rxcui="9002", loinc_code="34071-1",
-            section_type="standard", chunk_text="Zqlorafenib other-drug control chunk.",
-            token_count=5,
-        ),
-        dict(
-            setid=sid(5), drug_name="drugsec", rxcui="9001", loinc_code="34090-1",
-            section_type="standard", chunk_text="Zqlorafenib other-section control chunk.",
-            token_count=5,
-        ),
+        {
+            "setid": sid(1), "drug_name": "drugsec", "rxcui": "9001", "loinc_code": "34071-1",
+            "section_type": "standard", "chunk_text": "Zqlorafenib section chunk 1 of 3.",
+            "token_count": 6,
+        },
+        {
+            "setid": sid(2), "drug_name": "drugsec", "rxcui": "9001", "loinc_code": "34071-1",
+            "section_type": "standard", "chunk_text": "Zqlorafenib section chunk 2 of 3.",
+            "token_count": 6,
+        },
+        {
+            "setid": sid(3), "drug_name": "drugsec", "rxcui": "9001", "loinc_code": "34071-1",
+            "section_type": "standard", "chunk_text": "Zqlorafenib section chunk 3 of 3.",
+            "token_count": 6,
+        },
+        {
+            "setid": sid(4), "drug_name": "drugsex", "rxcui": "9002", "loinc_code": "34071-1",
+            "section_type": "standard", "chunk_text": "Zqlorafenib other-drug control chunk.",
+            "token_count": 5,
+        },
+        {
+            "setid": sid(5), "drug_name": "drugsec", "rxcui": "9001", "loinc_code": "34090-1",
+            "section_type": "standard", "chunk_text": "Zqlorafenib other-section control chunk.",
+            "token_count": 5,
+        },
     ]
 
     with psycopg.connect(DSN) as conn:
@@ -283,38 +283,38 @@ def seeded_hybrid_chunks():
         return f"{_TEST_PREFIX}{run_id}-{n}"
 
     rows = [
-        dict(
-            setid=sid(1), drug_name="drugfus", rxcui="7001", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Zqlorafenib headache is common. Zqlorafenib headache occurs "
+        {
+            "setid": sid(1), "drug_name": "drugfus", "rxcui": "7001", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Zqlorafenib headache is common. Zqlorafenib headache occurs "
                         "frequently. Zqlorafenib headache is reported often.",
-            token_count=16, embedding=VEC_ORTHOGONAL,
-        ),
-        dict(
-            setid=sid(2), drug_name="drugfus", rxcui="7001", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Zqlorafenib is stored at room temperature away from moisture.",
-            token_count=10, embedding=VEC_CLOSE,
-        ),
-        dict(
-            setid=sid(3), drug_name="drugfus", rxcui="7001", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Zqlorafenib headache may occur.",
-            token_count=6, embedding=VEC_FAR,
-        ),
-        dict(
-            setid=sid(4), drug_name="drugfus", rxcui="7001", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Zqlorafenib packaging includes a child-resistant cap.",
-            token_count=8, embedding=VEC_OPPOSITE,
-        ),
-        dict(
-            setid=sid(5), drug_name="drugfux", rxcui="8002", loinc_code="34071-1",
-            section_type="standard",
-            chunk_text="Zqlorafenib headache is common. Zqlorafenib headache occurs "
+            "token_count": 16, "embedding": VEC_ORTHOGONAL,
+        },
+        {
+            "setid": sid(2), "drug_name": "drugfus", "rxcui": "7001", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Zqlorafenib is stored at room temperature away from moisture.",
+            "token_count": 10, "embedding": VEC_CLOSE,
+        },
+        {
+            "setid": sid(3), "drug_name": "drugfus", "rxcui": "7001", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Zqlorafenib headache may occur.",
+            "token_count": 6, "embedding": VEC_FAR,
+        },
+        {
+            "setid": sid(4), "drug_name": "drugfus", "rxcui": "7001", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Zqlorafenib packaging includes a child-resistant cap.",
+            "token_count": 8, "embedding": VEC_OPPOSITE,
+        },
+        {
+            "setid": sid(5), "drug_name": "drugfux", "rxcui": "8002", "loinc_code": "34071-1",
+            "section_type": "standard",
+            "chunk_text": "Zqlorafenib headache is common. Zqlorafenib headache occurs "
                         "frequently. Zqlorafenib headache is reported often.",
-            token_count=16, embedding=VEC_ORTHOGONAL,
-        ),
+            "token_count": 16, "embedding": VEC_ORTHOGONAL,
+        },
     ]
 
     with psycopg.connect(DSN) as conn:

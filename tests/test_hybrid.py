@@ -1,7 +1,11 @@
 import pytest
 
 import backend.retrieval.hybrid as hybrid_module
-from backend.retrieval.hybrid import hybrid_search, reciprocal_rank_fusion, resolve_and_search
+from backend.retrieval.hybrid import (
+    hybrid_search,
+    reciprocal_rank_fusion,
+    resolve_and_search,
+)
 from tests.conftest import QUERY_VECTOR
 
 

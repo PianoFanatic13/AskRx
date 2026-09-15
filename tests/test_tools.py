@@ -1,6 +1,10 @@
 from unittest.mock import call, patch
 
-from backend.agent.tools import resolve_drug_name, retrieve_drug_info, retrieve_interactions
+from backend.agent.tools import (
+    resolve_drug_name,
+    retrieve_drug_info,
+    retrieve_interactions,
+)
 
 _MODULE = "backend.agent.tools"
 

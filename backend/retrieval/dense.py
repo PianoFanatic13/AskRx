@@ -1,7 +1,6 @@
 import logging
 import os
 import time
-from typing import Optional
 
 import psycopg
 import requests
@@ -71,8 +70,8 @@ def _embed_query(text: str) -> list[float]:
 def dense_search(
     query_text: str,
     *,
-    query_embedding: Optional[list[float]] = None,
-    rxcui: Optional[str] = None,
+    query_embedding: list[float] | None = None,
+    rxcui: str | None = None,
     top_k: int = 30,
     dsn: str = _DEFAULT_DSN,
 ) -> list[dict]:

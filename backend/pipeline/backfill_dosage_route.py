@@ -26,7 +26,7 @@ def _collect_dosage_route(
     for i, xml_path in enumerate(xml_paths, 1):
         try:
             header = extract_header(str(xml_path))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - one bad file shouldn't abort the whole backfill run
             log.warning("Header extraction failed for %s: %s", xml_path.name, exc)
             continue
         setid = header.get("setid")

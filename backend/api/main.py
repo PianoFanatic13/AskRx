@@ -39,7 +39,7 @@ def chat(request: ChatRequest):
     thread_id = request.thread_id or str(uuid4())
     try:
         result = ask(request.message, thread_id)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: any agent failure becomes a clean 503, never a raw traceback
         return JSONResponse(
             status_code=503,
             content={"error": f"agent failed: {e}"},

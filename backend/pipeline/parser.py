@@ -1,6 +1,6 @@
 import re
+
 from lxml import etree
-from typing import Optional
 
 NS = "urn:hl7-org:v3"
 NCI_CS = "2.16.840.1.113883.3.26.1.1"
@@ -76,7 +76,7 @@ PATIENT_COUNSELING_LOINC = {"34076-0", "59845-8"}
 CLINICAL_PHARMA_LOINC    = {"34090-1", "43679-0", "43682-4", "43681-6", "34092-7"}
 
 
-def _t(el) -> Optional[str]:
+def _t(el) -> str | None:
     if el is None:
         return None
     text = (el.text or "").strip()
@@ -90,7 +90,7 @@ def _normalize_title(title: str) -> str:
     return re.sub(r'\s+', ' ', title).strip()
 
 
-def _infer_loinc(title: str) -> Optional[str]:
+def _infer_loinc(title: str) -> str | None:
     if not title:
         return None
     return TITLE_LOINC_MAP.get(_normalize_title(title))
@@ -99,8 +99,8 @@ def _infer_loinc(title: str) -> Optional[str]:
 def _resolve_loinc(
     code_el,
     title: str,
-    parent_loinc: Optional[str],
-) -> tuple[Optional[str], Optional[str]]:
+    parent_loinc: str | None,
+) -> tuple[str | None, str | None]:
     # Priority: direct code -> title inference -> inherit from parent -> None
     # 42229-5 (unclassified) is treated as absent so inheritance still applies
     if code_el is not None:
@@ -119,13 +119,13 @@ def _resolve_loinc(
     return None, None
 
 
-def _should_drop(loinc_code: Optional[str], title: str) -> bool:
+def _should_drop(loinc_code: str | None, title: str) -> bool:
     if loinc_code in DROP_LOINC:
         return True
     return _normalize_title(title) in DROP_TITLE_PATTERNS
 
 
-def _get_section_type(loinc_code: Optional[str], doc_type: Optional[str]) -> str:
+def _get_section_type(loinc_code: str | None, doc_type: str | None) -> str:
     if loinc_code in MEDICATION_GUIDE_LOINC:
         return "medication_guide"
     if loinc_code in PPI_LOINC:
@@ -170,8 +170,8 @@ def _extract_text(text_el) -> str:
 
 def _walk(
     parent_el,
-    doc_type: Optional[str],
-    parent_loinc: Optional[str],
+    doc_type: str | None,
+    parent_loinc: str | None,
     parent_title_path: list[str],
     depth: int,
     results: list,
@@ -213,7 +213,7 @@ def _walk(
         _walk(section, doc_type, loinc_code, title_path, depth + 1, results)
 
 
-def walk_sections(structured_body, doc_type: Optional[str]) -> list[dict]:
+def walk_sections(structured_body, doc_type: str | None) -> list[dict]:
     """Walk a structuredBody element and return a flat list of section dicts, drop-filtered and type-tagged."""
     results = []
     _walk(structured_body, doc_type, None, [], 0, results)

@@ -62,7 +62,7 @@ def backfill(
 
             try:
                 header = extract_header(str(xml_path))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - one bad file shouldn't abort the whole backfill run
                 log.warning("Header extraction failed for %s: %s", xml_path.name, exc)
                 continue
 

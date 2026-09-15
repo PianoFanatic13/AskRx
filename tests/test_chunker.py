@@ -1,5 +1,11 @@
 from unittest.mock import patch
-from backend.pipeline.chunker import chunk_section_text, chunk_section, TOKEN_CEIL, TOKEN_FLOOR
+
+from backend.pipeline.chunker import (
+    TOKEN_CEIL,
+    TOKEN_FLOOR,
+    chunk_section,
+    chunk_section_text,
+)
 
 _PATCH = "backend.pipeline.chunker.count_tokens"
 

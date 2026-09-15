@@ -1,4 +1,3 @@
-from typing import Optional
 
 from backend.retrieval.dense import dense_search
 from backend.retrieval.rxnorm_query import resolve_query_drug
@@ -27,8 +26,8 @@ def reciprocal_rank_fusion(keyword_ids: list, dense_ids: list, *, k: int = _RRF_
 def hybrid_search(
     query_text: str,
     *,
-    query_embedding: Optional[list[float]] = None,
-    rxcui: Optional[str] = None,
+    query_embedding: list[float] | None = None,
+    rxcui: str | None = None,
     retriever_top_k: int = 30,
     top_k: int = 10,
     dsn: str = _DEFAULT_DSN,
@@ -60,9 +59,9 @@ def hybrid_search(
 
 def resolve_and_search(
     query_text: str,
-    drug_name: Optional[str] = None,
+    drug_name: str | None = None,
     *,
-    query_embedding: Optional[list[float]] = None,
+    query_embedding: list[float] | None = None,
     retriever_top_k: int = 30,
     top_k: int = 10,
     dsn: str = _DEFAULT_DSN,

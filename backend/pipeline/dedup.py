@@ -1,7 +1,6 @@
-import re
 import logging
+import re
 from collections import defaultdict
-from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ OTC_MONOGRAPH_CODES = {"C200263"}  # OTC Monograph Drug
 _KNOWN_CODES = NDA_CODES | ANDA_CODES | OTC_MONOGRAPH_CODES
 
 
-def _norm(s: Optional[str]) -> str:
+def _norm(s: str | None) -> str:
     if not s:
         return ""
     s = re.sub(r'[^A-Z0-9\s]', ' ', s.upper())
@@ -45,7 +44,7 @@ def _latest(records: list[dict]) -> dict:
     return max(records, key=lambda r: r.get("effective_time") or "")
 
 
-def _pick_from_group(records: list[dict]) -> Optional[str]:
+def _pick_from_group(records: list[dict]) -> str | None:
     """Return the canonical SETID for one dedup group, or None to skip the group."""
     # Genuinely unrecognized codes (non-None, not in known set) — log and skip
     bad_code = [

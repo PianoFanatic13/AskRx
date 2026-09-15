@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -17,8 +16,16 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel
 
-from backend.agent.prompts import DISCLAIMER_TEXT, PHARMACIST_ROUTING_TEXT, SYSTEM_PROMPT
-from backend.agent.tools import resolve_drug_name, retrieve_drug_info, retrieve_interactions
+from backend.agent.prompts import (
+    DISCLAIMER_TEXT,
+    PHARMACIST_ROUTING_TEXT,
+    SYSTEM_PROMPT,
+)
+from backend.agent.tools import (
+    resolve_drug_name,
+    retrieve_drug_info,
+    retrieve_interactions,
+)
 
 load_dotenv()
 
@@ -28,7 +35,7 @@ _DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
 
 _TOOLS = [resolve_drug_name, retrieve_drug_info, retrieve_interactions]
 
-_pool: Optional[ConnectionPool] = None
+_pool: ConnectionPool | None = None
 
 
 def _get_pool() -> ConnectionPool:
@@ -67,7 +74,7 @@ def get_llm() -> BaseChatModel:
 class Citation(BaseModel):
     marker: int
     setid: str
-    loinc_code: Optional[str]
+    loinc_code: str | None
     section_title_path: str
 
 
@@ -78,7 +85,7 @@ class AgentAnswer(BaseModel):
 
 
 class AgentState(MessagesState):
-    structured_response: Optional[AgentAnswer]
+    structured_response: AgentAnswer | None
 
 
 def build_graph(*, use_postgres: bool = True) -> CompiledStateGraph:
@@ -139,7 +146,7 @@ def build_graph(*, use_postgres: bool = True) -> CompiledStateGraph:
     return builder.compile(checkpointer=checkpointer)
 
 
-_graph: Optional[CompiledStateGraph] = None
+_graph: CompiledStateGraph | None = None
 
 
 def ask(query: str, thread_id: str) -> AgentAnswer:

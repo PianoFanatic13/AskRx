@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 _MODEL = "BAAI/bge-large-en-v1.5"

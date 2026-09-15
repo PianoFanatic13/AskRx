@@ -65,7 +65,7 @@ def _pass1(
     for i, xml_path in enumerate(xml_paths, 1):
         try:
             header = extract_header(str(xml_path))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - one bad file shouldn't abort a 150k-file ingestion run
             log.warning("Header extraction failed for %s: %s", xml_path.name, exc)
             continue
 
@@ -116,7 +116,7 @@ def _pass2(
                 continue
             try:
                 label = parse_label(str(xml_path))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - one bad file shouldn't abort a 150k-file ingestion run
                 log.warning("parse_label failed for %s: %s", setid, exc)
                 continue
 

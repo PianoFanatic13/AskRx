@@ -1,8 +1,12 @@
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
-from backend.pipeline.rxnorm import find_ingredient_rxcui, find_rxcui_approx_candidates, find_rxcui_exact
+from backend.pipeline.rxnorm import (
+    find_ingredient_rxcui,
+    find_rxcui_approx_candidates,
+    find_rxcui_exact,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CACHE_PATH = _REPO_ROOT / "data" / "rxnorm_cache.json"
@@ -22,7 +26,7 @@ def _load_rxnorm_cache(path: Path) -> dict:
         return json.load(f)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load_lowered_cache(path: Path) -> dict:
     """Load and case-fold the RxNorm cache once per path, then reuse from memory.
 

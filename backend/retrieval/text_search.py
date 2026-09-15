@@ -1,4 +1,3 @@
-from typing import Optional
 
 import psycopg
 from psycopg.rows import dict_row
@@ -24,7 +23,7 @@ _QUERY = """
 def text_search(
     query_text: str,
     *,
-    rxcui: Optional[str] = None,
+    rxcui: str | None = None,
     top_k: int = 30,
     dsn: str = _DEFAULT_DSN,
 ) -> list[dict]:
@@ -40,10 +39,9 @@ def text_search(
     if rxcui is not None:
         params["rxcui"] = rxcui
 
-    with psycopg.connect(dsn) as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(sql, params)
-            return cur.fetchall()
+    with psycopg.connect(dsn) as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(sql, params)
+        return cur.fetchall()
 
 
 _SECTION_QUERY = f"""
@@ -61,7 +59,6 @@ def get_section(rxcui: str, loinc_code: str, *, dsn: str = _DEFAULT_DSN) -> list
     document order — ids increase in document order since chunks are
     inserted in the order the chunker produces them.
     """
-    with psycopg.connect(dsn) as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(_SECTION_QUERY, {"rxcui": rxcui, "loinc_code": loinc_code})
-            return cur.fetchall()
+    with psycopg.connect(dsn) as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(_SECTION_QUERY, {"rxcui": rxcui, "loinc_code": loinc_code})
+        return cur.fetchall()

@@ -4,8 +4,14 @@ Run with: pytest -m integration
 Skipped in normal test runs to avoid network dependency.
 """
 import re
+
 import pytest
-from backend.pipeline.rxnorm import find_ingredient_rxcui, resolve_rxcui, set_failure_log
+
+from backend.pipeline.rxnorm import (
+    find_ingredient_rxcui,
+    resolve_rxcui,
+    set_failure_log,
+)
 
 RXCUI_RE = re.compile(r"^\d+$")
 

@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -13,14 +13,17 @@ from langsmith import Client
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="ragas")
 
-import ragas.messages as ragas_messages  # noqa: E402
-from ragas import evaluate  # noqa: E402
-from ragas.dataset_schema import EvaluationDataset, MultiTurnSample, SingleTurnSample  # noqa: E402
-from ragas.embeddings import LangchainEmbeddingsWrapper  # noqa: E402
-from ragas.llms import LangchainLLMWrapper  # noqa: E402
-from ragas.messages import ToolCall  # noqa: E402
-from ragas.run_config import RunConfig  # noqa: E402
-from ragas.metrics import (  # noqa: E402
+import ragas.messages as ragas_messages
+from ragas import evaluate
+from ragas.dataset_schema import (
+    EvaluationDataset,
+    MultiTurnSample,
+    SingleTurnSample,
+)
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
+from ragas.messages import ToolCall
+from ragas.metrics import (
     AgentGoalAccuracyWithReference,
     AnswerRelevancy,
     Faithfulness,
@@ -28,6 +31,7 @@ from ragas.metrics import (  # noqa: E402
     LLMContextRecall,
     ToolCallAccuracy,
 )
+from ragas.run_config import RunConfig
 
 from backend.agent.graph import ask_with_trace
 
@@ -102,7 +106,7 @@ def _trace_url(run_id: str) -> str | None:
     try:
         client = Client()
         return client.get_run_url(run=client.read_run(run_id))
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort trace link, any failure just omits it
         return None
 
 
@@ -158,7 +162,7 @@ def run_eval(dataset_path: Path, report_path: Path) -> dict:
     multi_scores = multi_result.to_pandas().to_dict(orient="records")
 
     report = {
-        "run_at": datetime.now(timezone.utc).isoformat(),
+        "run_at": datetime.now(UTC).isoformat(),
         "judge_model": _JUDGE_LLM.langchain_llm.model_name,
         "dataset_path": str(dataset_path),
         "queries": [
@@ -181,7 +185,7 @@ def run_eval(dataset_path: Path, report_path: Path) -> dict:
 
 def _default_report_path() -> Path:
     """Timestamped path so repeat runs build up a history instead of overwriting each other."""
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return Path("backend/eval/reports") / f"report_{ts}.json"
 
 

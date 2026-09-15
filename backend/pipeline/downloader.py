@@ -1,8 +1,8 @@
 import io
 import logging
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 log = logging.getLogger(__name__)
 
