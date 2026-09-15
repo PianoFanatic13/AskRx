@@ -1,3 +1,4 @@
+from functools import partial
 from unittest.mock import MagicMock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -247,6 +248,12 @@ class TestAsk:
         import backend.agent.graph as graph_module
 
         monkeypatch.setattr(graph_module, "_graph", None)
+        # ask() calls build_graph() with no args (use_postgres=True default) -
+        # this test needs a real, working checkpointer to verify delete_thread
+        # actually clears state, but not specifically the Postgres backend, so
+        # it pins the fast in-memory one to stay DB-free like the rest of this
+        # mocked suite.
+        monkeypatch.setattr(graph_module, "build_graph", partial(graph_module.build_graph, use_postgres=False))
         final_msg = AIMessage(content="response")
         final_answer = AgentAnswer(answer="answer", citations=[], high_risk=False)
         mock_llm = _mock_llm([final_msg, final_msg], final_answer)
