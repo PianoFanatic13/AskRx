@@ -8,10 +8,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 from pydantic import BaseModel
 
 from backend.agent.prompts import DISCLAIMER_TEXT, PHARMACIST_ROUTING_TEXT, SYSTEM_PROMPT
@@ -21,8 +24,32 @@ load_dotenv()
 
 _DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
 _DEFAULT_OLLAMA_MODEL = "llama3.1"
+_DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
 
 _TOOLS = [resolve_drug_name, retrieve_drug_info, retrieve_interactions]
+
+_pool: Optional[ConnectionPool] = None
+
+
+def _get_pool() -> ConnectionPool:
+    """Module-level connection pool for the Postgres-backed checkpointer.
+
+    Small pool size (Render's free tier runs one instance, one worker) -
+    kept modest so a micro-sized RDS instance's connection limit isn't
+    threatened by the checkpointer alongside every other module's own
+    psycopg.connect() calls.
+    """
+    global _pool
+    if _pool is None:
+        dsn = os.getenv("DATABASE_URL", _DEFAULT_DSN)
+        _pool = ConnectionPool(
+            conninfo=dsn,
+            min_size=1,
+            max_size=5,
+            kwargs={"autocommit": True, "row_factory": dict_row},
+            open=True,
+        )
+    return _pool
 
 
 def get_llm() -> BaseChatModel:
@@ -54,12 +81,20 @@ class AgentState(MessagesState):
     structured_response: Optional[AgentAnswer]
 
 
-def build_graph() -> CompiledStateGraph:
+def build_graph(*, use_postgres: bool = True) -> CompiledStateGraph:
     """Assemble the ReAct loop: reason (agent) -> act (tools) -> ... -> structured answer.
 
     LLM binding and node closures live inside this function (not at module
     level) so tests can patch get_llm and call build_graph() fresh to get a
     graph wired to the mock, instead of fighting import-time state.
+
+    use_postgres=True (production default) persists conversation state to
+    Postgres (DATABASE_URL) via PostgresSaver, so it survives process
+    restarts - needed on Render's free tier, which spins down after 15
+    minutes idle and would otherwise silently wipe every conversation on
+    each cold start. Tests pass use_postgres=False for the original
+    in-process MemorySaver behavior, keeping the mocked test suite free of
+    any real Postgres dependency.
     """
     llm_with_tools = get_llm().bind_tools(_TOOLS).with_retry(stop_after_attempt=4)
     structured_llm = get_llm().with_structured_output(AgentAnswer).with_retry(stop_after_attempt=4)
@@ -96,7 +131,12 @@ def build_graph() -> CompiledStateGraph:
     builder.add_edge("post_process", END)
 
     serde = JsonPlusSerializer(allowed_msgpack_modules=[AgentAnswer, Citation])
-    return builder.compile(checkpointer=MemorySaver(serde=serde))
+    if use_postgres:
+        checkpointer = PostgresSaver(_get_pool(), serde=serde)
+        checkpointer.setup()
+    else:
+        checkpointer = MemorySaver(serde=serde)
+    return builder.compile(checkpointer=checkpointer)
 
 
 _graph: Optional[CompiledStateGraph] = None

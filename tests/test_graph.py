@@ -39,7 +39,7 @@ def test_no_tool_call_routes_straight_to_final_answer():
     final_answer = AgentAnswer(answer="A plain answer.", citations=[], high_risk=False)
 
     with patch(f"{_GRAPH_MODULE}.get_llm", return_value=_mock_llm([final_msg], final_answer)):
-        graph = build_graph()
+        graph = build_graph(use_postgres=False)
         result = graph.invoke(
             {"messages": [HumanMessage("hello")]}, {"configurable": {"thread_id": _THREAD}}
         )
@@ -60,7 +60,7 @@ def test_tool_call_loops_back_before_final_answer():
         patch(f"{_GRAPH_MODULE}.get_llm", return_value=_mock_llm([tool_call_msg, final_msg], final_answer)),
         patch(f"{_TOOLS_MODULE}.resolve_query_drug", return_value=resolution) as mock_resolve,
     ):
-        graph = build_graph()
+        graph = build_graph(use_postgres=False)
         result = graph.invoke(
             {"messages": [HumanMessage("what is metformin's rxcui?")]},
             {"configurable": {"thread_id": _THREAD}},
@@ -81,7 +81,7 @@ class TestConversationMemory:
         config = {"configurable": {"thread_id": _THREAD}}
 
         with patch(f"{_GRAPH_MODULE}.get_llm", return_value=_mock_llm([final_msg_1, final_msg_2], final_answer)):
-            graph = build_graph()
+            graph = build_graph(use_postgres=False)
             graph.invoke({"messages": [HumanMessage("first turn")]}, config)
             result = graph.invoke({"messages": [HumanMessage("second turn")]}, config)
 
@@ -96,7 +96,7 @@ class TestConversationMemory:
         final_answer = AgentAnswer(answer="answer", citations=[], high_risk=False)
 
         with patch(f"{_GRAPH_MODULE}.get_llm", return_value=_mock_llm([final_msg, final_msg], final_answer)):
-            graph = build_graph()
+            graph = build_graph(use_postgres=False)
             graph.invoke(
                 {"messages": [HumanMessage("thread one message")]},
                 {"configurable": {"thread_id": "thread-1"}},
@@ -171,7 +171,7 @@ class TestAmbiguousDrugClarification:
             ) as mock_resolve,
             patch(f"{_TOOLS_MODULE}.hybrid_search", return_value=[chunk]) as mock_search,
         ):
-            graph = build_graph()
+            graph = build_graph(use_postgres=False)
             turn1 = graph.invoke({"messages": [HumanMessage("side effects of metfromin?")]}, config)
             turn2 = graph.invoke({"messages": [HumanMessage("I meant metformin")]}, config)
 
@@ -192,7 +192,7 @@ class TestPostProcessing:
         final_answer = AgentAnswer(answer="Some facts.", citations=[], high_risk=False)
 
         with patch(f"{_GRAPH_MODULE}.get_llm", return_value=_mock_llm([final_msg], final_answer)):
-            graph = build_graph()
+            graph = build_graph(use_postgres=False)
             result = graph.invoke(
                 {"messages": [HumanMessage("hello")]}, {"configurable": {"thread_id": _THREAD}}
             )
@@ -204,7 +204,7 @@ class TestPostProcessing:
         final_answer = AgentAnswer(answer="Some facts.", citations=[], high_risk=True)
 
         with patch(f"{_GRAPH_MODULE}.get_llm", return_value=_mock_llm([final_msg], final_answer)):
-            graph = build_graph()
+            graph = build_graph(use_postgres=False)
             result = graph.invoke(
                 {"messages": [HumanMessage("hello")]}, {"configurable": {"thread_id": _THREAD}}
             )
@@ -216,7 +216,7 @@ class TestPostProcessing:
         final_answer = AgentAnswer(answer="Some facts.", citations=[], high_risk=False)
 
         with patch(f"{_GRAPH_MODULE}.get_llm", return_value=_mock_llm([final_msg], final_answer)):
-            graph = build_graph()
+            graph = build_graph(use_postgres=False)
             result = graph.invoke(
                 {"messages": [HumanMessage("hello")]}, {"configurable": {"thread_id": _THREAD}}
             )

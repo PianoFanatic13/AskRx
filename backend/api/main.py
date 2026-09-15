@@ -7,9 +7,10 @@ from pydantic import BaseModel
 
 from backend.agent.graph import Citation, ask
 
-# Run with `uvicorn backend.api.main:app --workers 1` - MemorySaver keeps
-# conversation state in-process, so multiple workers would each have their
-# own memory and silently break multi-turn continuity across requests.
+# Run with `uvicorn backend.api.main:app --workers 1` - conversation state is
+# now Postgres-backed (PostgresSaver, see graph.py) and shared across workers,
+# so this is no longer a correctness requirement. Kept as the deploy config
+# anyway since Render's free tier only ever runs one instance.
 app = FastAPI(title="AskRx API")
 
 # permissive dev CORS; restrict to the real frontend origin once Phase 5 picks one
