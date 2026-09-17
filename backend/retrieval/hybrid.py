@@ -1,9 +1,14 @@
+import os
+
+from dotenv import load_dotenv
 
 from backend.retrieval.dense import dense_search
 from backend.retrieval.rxnorm_query import resolve_query_drug
 from backend.retrieval.text_search import text_search
 
-_DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
+load_dotenv()
+
+_DEFAULT_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/asrx")
 
 _RRF_K = 60
 

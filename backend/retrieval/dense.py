@@ -12,7 +12,7 @@ load_dotenv()
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
+_DEFAULT_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/asrx")
 _MODEL_ID = "BAAI/bge-large-en-v1.5"
 _HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{_MODEL_ID}/pipeline/feature-extraction"
 

@@ -1,8 +1,12 @@
+import os
 
 import psycopg
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
 
-_DEFAULT_DSN = "postgresql://postgres:postgres@localhost:5432/asrx"
+load_dotenv()
+
+_DEFAULT_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/asrx")
 
 _COLUMNS = """
     id, setid, drug_name, rxcui, loinc_code, section_title_path, section_type,
