@@ -59,12 +59,27 @@ def _get_pool() -> ConnectionPool:
     return _pool
 
 
+_LLM_TIMEOUT_SECONDS = 30.0
+
+
 def get_llm() -> BaseChatModel:
-    """Return a chat model instance, backend selected via LLM_BACKEND (gemini|ollama)."""
+    """Return a chat model instance, backend selected via LLM_BACKEND (gemini|ollama).
+
+    Gemini gets an explicit timeout (defaults to none otherwise) - discovered
+    live on Render, where a hung call with no timeout sat for 13+ minutes
+    with no error, no traceback, and no completed-request log, until the
+    process was eventually killed. A bounded timeout turns that into a
+    fast, visible failure (caught by the API's error handler) instead of
+    an indefinite silent hang. ChatOllama has no timeout field to set, but
+    it's local-dev-only - never the production backend.
+    """
     backend = os.getenv("LLM_BACKEND", "gemini")
 
     if backend == "gemini":
-        return ChatGoogleGenerativeAI(model=os.getenv("GEMINI_MODEL", _DEFAULT_GEMINI_MODEL))
+        return ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_MODEL", _DEFAULT_GEMINI_MODEL),
+            timeout=_LLM_TIMEOUT_SECONDS,
+        )
     if backend == "ollama":
         return ChatOllama(model=os.getenv("OLLAMA_MODEL", _DEFAULT_OLLAMA_MODEL))
 
