@@ -17,6 +17,7 @@ from psycopg_pool import ConnectionPool
 from pydantic import BaseModel
 
 from backend.agent.prompts import (
+    AGENT_LOOP_SYSTEM_PROMPT,
     DISCLAIMER_TEXT,
     PHARMACIST_ROUTING_TEXT,
     SYSTEM_PROMPT,
@@ -122,7 +123,7 @@ def build_graph(*, use_postgres: bool = True) -> CompiledStateGraph:
     structured_llm = get_llm().with_structured_output(AgentAnswer).with_retry(stop_after_attempt=4)
 
     def agent_node(state: AgentState) -> dict:
-        response = llm_with_tools.invoke([SystemMessage(SYSTEM_PROMPT)] + state["messages"])
+        response = llm_with_tools.invoke([SystemMessage(AGENT_LOOP_SYSTEM_PROMPT)] + state["messages"])
         return {"messages": [response]}
 
     def generate_structured_answer_node(state: AgentState) -> dict:
